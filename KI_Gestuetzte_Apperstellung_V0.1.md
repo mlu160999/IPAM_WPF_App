@@ -207,10 +207,6 @@ Anschliessend wurde die Anwendung getestet:
 -   Die eingegebenen Daten wurden korrekt angezeigt und gespeichert.
 -   Die getesteten Grundfunktionen funktionierten wie vorgesehen.
 
-> **Screenshot:** Auf Seite 7 des Originaldokuments ist die laufende
-> Anwendung zu sehen. Sie zeigt mehrere Subnetze sowie IP-Adressen mit
-> den Statuswerten „Frei", „Reserviert" und „Zugewiesen".
-
 ### Erkenntnis
 
 Bei .NET-Projekten müssen das verwendete **Zielframework**, das
