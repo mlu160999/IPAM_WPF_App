@@ -1,5 +1,5 @@
-using Microsoft.Data.Sqlite;
-using System.Net;
+using IPAM_WPF_App.Models;
+using IPAM_WPF_App.Services;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -7,26 +7,28 @@ namespace IPAM_WPF_App;
 
 public partial class MainWindow : Window
 {
-    private readonly SubnetRepository _subnetRepository;
-    private readonly IPAdresseRepository _ipAdresseRepository;
+    private readonly ApplicationService _applicationService;
+    private readonly SubnetService _subnetService;
+    private readonly IPAdresseService _ipAdresseService;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        DbInitializer.Initialize();
+        _applicationService = new ApplicationService();
+        _subnetService = new SubnetService();
+        _ipAdresseService = new IPAdresseService();
 
-        _subnetRepository = new SubnetRepository();
-        _ipAdresseRepository = new IPAdresseRepository();
-
+        _applicationService.InitializeDatabase();
         LoadSubnets();
     }
 
     private void LoadSubnets()
     {
-        int? selectedSubnetId = (SubnetDataGrid.SelectedItem as Subnet)?.Id;
+        int? selectedSubnetId =
+            (SubnetDataGrid.SelectedItem as Subnet)?.Id;
 
-        SubnetDataGrid.ItemsSource = _subnetRepository.GetAll();
+        SubnetDataGrid.ItemsSource = _subnetService.GetAll();
 
         if (selectedSubnetId.HasValue)
         {
@@ -43,140 +45,179 @@ public partial class MainWindow : Window
 
     private void LoadIpAdressen(int subnetId)
     {
-        IpAdresseDataGrid.ItemsSource = _ipAdresseRepository.GetBySubnetId(subnetId);
+        IpAdresseDataGrid.ItemsSource =
+            _ipAdresseService.GetBySubnetId(subnetId);
     }
 
-    private void SubnetDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void SubnetDataGrid_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
     {
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
             IpAdresseDataGrid.ItemsSource = null;
-            SelectedSubnetTextBlock.Text = "Bitte zuerst ein Subnet auswählen.";
+            SelectedSubnetTextBlock.Text =
+                "Bitte zuerst ein Subnet auswählen.";
             return;
         }
 
-        SelectedSubnetTextBlock.Text = $"Ausgewähltes Subnet: {subnet.Name}";
+        SelectedSubnetTextBlock.Text =
+            $"Ausgewähltes Subnet: {subnet.Name}";
         LoadIpAdressen(subnet.Id);
     }
 
-    private void AddSubnetButton_Click(object sender, RoutedEventArgs e)
+    private void AddSubnetButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
-        string name = SubnetNameTextBox.Text.Trim();
-        string beschreibung = SubnetBeschreibungTextBox.Text.Trim();
+        bool wurdeHinzugefuegt = _subnetService.Add(
+            SubnetNameTextBox.Text,
+            SubnetBeschreibungTextBox.Text);
 
-        if (string.IsNullOrWhiteSpace(name))
+        if (!wurdeHinzugefuegt)
         {
-            MessageBox.Show("Bitte einen Namen oder ein CIDR für das Subnet eingeben.",
-                "Eingabe fehlt", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                "Bitte einen Namen oder ein CIDR für das Subnet eingeben.",
+                "Eingabe fehlt",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
-
-        _subnetRepository.Add(name, beschreibung);
 
         SubnetNameTextBox.Clear();
         SubnetBeschreibungTextBox.Clear();
         LoadSubnets();
     }
 
-    private void DeleteSubnetButton_Click(object sender, RoutedEventArgs e)
+    private void DeleteSubnetButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
-            MessageBox.Show("Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "Bitte zuerst ein Subnet auswählen.",
+                "Keine Auswahl",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         MessageBoxResult result = MessageBox.Show(
-            $"Subnet '{subnet.Name}' wirklich löschen?\nAlle zugehörigen IP-Adressen werden ebenfalls gelöscht.",
+            $"Subnet '{subnet.Name}' wirklich löschen?\n" +
+            "Alle zugehörigen IP-Adressen werden ebenfalls gelöscht.",
             "Subnet löschen",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
         if (result != MessageBoxResult.Yes)
+        {
             return;
+        }
 
-        _subnetRepository.Delete(subnet.Id);
+        _subnetService.Delete(subnet.Id);
         IpAdresseDataGrid.ItemsSource = null;
-        SelectedSubnetTextBlock.Text = "Bitte zuerst ein Subnet auswählen.";
+        SelectedSubnetTextBlock.Text =
+            "Bitte zuerst ein Subnet auswählen.";
         LoadSubnets();
     }
 
-    private void AddIpAdresseButton_Click(object sender, RoutedEventArgs e)
+    private void AddIpAdresseButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
-            MessageBox.Show("Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "Bitte zuerst ein Subnet auswählen.",
+                "Keine Auswahl",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
-        string ipText = IpAdresseTextBox.Text.Trim();
+        IpAdresseAddResult result = _ipAdresseService.Add(
+            IpAdresseTextBox.Text,
+            subnet.Id);
 
-        if (!IPAddress.TryParse(ipText, out _))
+        switch (result)
         {
-            MessageBox.Show("Bitte eine gültige IPv4- oder IPv6-Adresse eingeben.",
-                "Ungültige IP-Adresse", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
+            case IpAdresseAddResult.Ungueltig:
+                MessageBox.Show(
+                    "Bitte eine gültige IPv4- oder IPv6-Adresse eingeben.",
+                    "Ungültige IP-Adresse",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
 
-        try
-        {
-            _ipAdresseRepository.Add(ipText, subnet.Id);
-            IpAdresseTextBox.Clear();
-            LoadIpAdressen(subnet.Id);
-        }
-        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
-        {
-            MessageBox.Show("Diese IP-Adresse existiert in diesem Subnet bereits.",
-                "Doppelter Eintrag", MessageBoxButton.OK, MessageBoxImage.Warning);
+            case IpAdresseAddResult.BereitsVorhanden:
+                MessageBox.Show(
+                    "Diese IP-Adresse existiert in diesem Subnet bereits.",
+                    "Doppelter Eintrag",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+
+            case IpAdresseAddResult.Erfolgreich:
+                IpAdresseTextBox.Clear();
+                LoadIpAdressen(subnet.Id);
+                break;
         }
     }
 
-    private void AdvanceStatusButton_Click(object sender, RoutedEventArgs e)
+    private void AdvanceStatusButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
-            MessageBox.Show("Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "Bitte zuerst ein Subnet auswählen.",
+                "Keine Auswahl",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         if (IpAdresseDataGrid.SelectedItem is not IPAdresse ipAdresse)
         {
-            MessageBox.Show("Bitte zuerst eine IP-Adresse auswählen.",
-                "Keine Auswahl", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "Bitte zuerst eine IP-Adresse auswählen.",
+                "Keine Auswahl",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
-        int neuerStatus = ipAdresse.Erledigt switch
-        {
-            0 => 1, // Frei -> Reserviert
-            1 => 2, // Reserviert -> Zugewiesen
-            _ => 0  // Zugewiesen -> Frei
-        };
-
-        _ipAdresseRepository.UpdateStatus(ipAdresse.Id, neuerStatus);
+        _ipAdresseService.AdvanceStatus(ipAdresse);
         LoadIpAdressen(subnet.Id);
     }
 
-    private void DeleteIpAdresseButton_Click(object sender, RoutedEventArgs e)
+    private void DeleteIpAdresseButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
-            MessageBox.Show("Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "Bitte zuerst ein Subnet auswählen.",
+                "Keine Auswahl",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         if (IpAdresseDataGrid.SelectedItem is not IPAdresse ipAdresse)
         {
-            MessageBox.Show("Bitte zuerst eine IP-Adresse auswählen.",
-                "Keine Auswahl", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "Bitte zuerst eine IP-Adresse auswählen.",
+                "Keine Auswahl",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
-        _ipAdresseRepository.Delete(ipAdresse.Id);
+        _ipAdresseService.Delete(ipAdresse.Id);
         LoadIpAdressen(subnet.Id);
     }
 }

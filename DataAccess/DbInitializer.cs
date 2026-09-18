@@ -1,6 +1,6 @@
 using Microsoft.Data.Sqlite;
 
-namespace IPAM_WPF_App;
+namespace IPAM_WPF_App.DataAccess;
 
 public static class DbInitializer
 {
@@ -34,8 +34,8 @@ public static class DbInitializer
                 ProjektId INTEGER NOT NULL,
                 FOREIGN KEY (ProjektId) REFERENCES Subnet(Id) ON DELETE CASCADE,
                 UNIQUE (ProjektId, Titel)
-            );
-        ";
+            );";
+
         command.ExecuteNonQuery();
     }
 }

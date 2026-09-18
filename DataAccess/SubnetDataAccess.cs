@@ -1,16 +1,9 @@
+﻿using IPAM_WPF_App.Models;
 using Microsoft.Data.Sqlite;
 
-namespace IPAM_WPF_App;
+namespace IPAM_WPF_App.DataAccess;
 
-public class Subnet
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Beschreibung { get; set; } = string.Empty;
-    public string Erstellt { get; set; } = string.Empty;
-}
-
-public class SubnetRepository
+public class SubnetDataAccess
 {
     private const string ConnectionString = "Data Source=app.db";
 
@@ -44,7 +37,9 @@ public class SubnetRepository
             {
                 Id = reader.GetInt32(0),
                 Name = reader.GetString(1),
-                Beschreibung = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                Beschreibung = reader.IsDBNull(2)
+                    ? string.Empty
+                    : reader.GetString(2),
                 Erstellt = reader.GetString(3)
             });
         }
@@ -63,7 +58,9 @@ public class SubnetRepository
 
         command.Parameters.AddWithValue("$name", name);
         command.Parameters.AddWithValue("$beschreibung", beschreibung);
-        command.Parameters.AddWithValue("$erstellt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue(
+            "$erstellt",
+            DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
         return Convert.ToInt32((long)command.ExecuteScalar()!);
     }
