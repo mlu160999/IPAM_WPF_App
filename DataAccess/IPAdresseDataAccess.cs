@@ -1,24 +1,9 @@
+using IPAM_WPF_App.Models;
 using Microsoft.Data.Sqlite;
 
-namespace IPAM_WPF_App;
+namespace IPAM_WPF_App.DataAccess;
 
-public class IPAdresse
-{
-    public int Id { get; set; }
-    public string Titel { get; set; } = string.Empty;
-    public int Erledigt { get; set; }
-    public int ProjektId { get; set; }
-
-    public string Status => Erledigt switch
-    {
-        0 => "Frei",
-        1 => "Reserviert",
-        2 => "Zugewiesen",
-        _ => "Unbekannt"
-    };
-}
-
-public class IPAdresseRepository
+public class IPAdresseDataAccess
 {
     private const string ConnectionString = "Data Source=app.db";
 
@@ -62,19 +47,25 @@ public class IPAdresseRepository
         return addresses;
     }
 
-    public int Add(string titel, int subnetId)
+    public bool TryAdd(string titel, int subnetId)
     {
-        using var connection = CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            INSERT INTO IPAdresse (Titel, Erledigt, ProjektId)
-            VALUES ($titel, 0, $subnetId);
-            SELECT last_insert_rowid();";
+        try
+        {
+            using var connection = CreateOpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+                INSERT INTO IPAdresse (Titel, Erledigt, ProjektId)
+                VALUES ($titel, 0, $subnetId);";
 
-        command.Parameters.AddWithValue("$titel", titel);
-        command.Parameters.AddWithValue("$subnetId", subnetId);
-
-        return Convert.ToInt32((long)command.ExecuteScalar()!);
+            command.Parameters.AddWithValue("$titel", titel);
+            command.Parameters.AddWithValue("$subnetId", subnetId);
+            command.ExecuteNonQuery();
+            return true;
+        }
+        catch (SqliteException ex) when (ex.SqliteExtendedErrorCode == 2067)
+        {
+            return false;
+        }
     }
 
     public void Update(IPAdresse ipAdresse)

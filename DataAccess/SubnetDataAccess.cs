@@ -1,16 +1,9 @@
+using IPAM_WPF_App.Models;
 using Microsoft.Data.Sqlite;
 
-namespace IPAM_WPF_App;
+namespace IPAM_WPF_App.DataAccess;
 
-public class Subnet
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Beschreibung { get; set; } = string.Empty;
-    public string Erstellt { get; set; } = string.Empty;
-}
-
-public class SubnetRepository
+public class SubnetDataAccess
 {
     private const string ConnectionString = "Data Source=app.db";
 
