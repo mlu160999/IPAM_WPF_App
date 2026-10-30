@@ -1,6 +1,6 @@
 namespace IPAM_WPF_App.Models;
 
-public enum IpStatus
+public enum IPStatus
 {
     Frei = 0,
     Reserviert = 1,
