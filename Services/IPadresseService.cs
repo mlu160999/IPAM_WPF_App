@@ -4,7 +4,7 @@ using System.Net;
 
 namespace IPAM_WPF_App.Services;
 
-public enum IpAdresseAddResult
+public enum IPAdresseAddResult
 {
     Erfolgreich,
     Ungueltig,
