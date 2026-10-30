@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace IPAM_WPF_App.DataAccess;
 
-public class IPAdresseDataAccess
+public class IpAdresseDataAccess
 {
     public List<IPAdresse> GetBySubnetId(int subnetId)
     {
