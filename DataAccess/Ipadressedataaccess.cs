@@ -3,33 +3,19 @@ using Microsoft.Data.Sqlite;
 
 namespace IPAM_WPF_App.DataAccess;
 
-public class IPAdresseRepository
+public class IPAdresseDataAccess
 {
-    private const string ConnectionString = "Data Source=app.db";
-
-    private static SqliteConnection CreateOpenConnection()
-    {
-        var connection = new SqliteConnection(ConnectionString);
-        connection.Open();
-
-        using var pragmaCommand = connection.CreateCommand();
-        pragmaCommand.CommandText = "PRAGMA foreign_keys = ON;";
-        pragmaCommand.ExecuteNonQuery();
-
-        return connection;
-    }
-
     public List<IPAdresse> GetBySubnetId(int subnetId)
     {
         var addresses = new List<IPAdresse>();
 
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = @"
-            SELECT Id, Titel, Erledigt, ProjektId
+            SELECT Id, Adresse, Status, SubnetId
             FROM IPAdresse
-            WHERE ProjektId = $subnetId
-            ORDER BY Titel;";
+            WHERE SubnetId = $subnetId
+            ORDER BY Adresse;";
         command.Parameters.AddWithValue("$subnetId", subnetId);
 
         using var reader = command.ExecuteReader();
@@ -38,26 +24,27 @@ public class IPAdresseRepository
             addresses.Add(new IPAdresse
             {
                 Id = reader.GetInt32(0),
-                Titel = reader.GetString(1),
-                Erledigt = reader.GetInt32(2),
-                ProjektId = reader.GetInt32(3)
+                Adresse = reader.GetString(1),
+                Status = (IpStatus)reader.GetInt32(2),
+                SubnetId = reader.GetInt32(3)
             });
         }
 
         return addresses;
     }
 
-    public bool TryAdd(string titel, int subnetId)
+    public bool TryAdd(string adresse, int subnetId)
     {
         try
         {
-            using var connection = CreateOpenConnection();
+            using var connection = DbInitializer.CreateOpenConnection();
             using var command = connection.CreateCommand();
             command.CommandText = @"
-                INSERT INTO IPAdresse (Titel, Erledigt, ProjektId)
-                VALUES ($titel, 0, $subnetId);";
+                INSERT INTO IPAdresse (Adresse, Status, SubnetId)
+                VALUES ($adresse, $status, $subnetId);";
 
-            command.Parameters.AddWithValue("$titel", titel);
+            command.Parameters.AddWithValue("$adresse", adresse);
+            command.Parameters.AddWithValue("$status", (int)IpStatus.Frei);
             command.Parameters.AddWithValue("$subnetId", subnetId);
             command.ExecuteNonQuery();
             return true;
@@ -70,39 +57,39 @@ public class IPAdresseRepository
 
     public void Update(IPAdresse ipAdresse)
     {
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = @"
             UPDATE IPAdresse
-            SET Titel = $titel,
-                Erledigt = $erledigt,
-                ProjektId = $projektId
+            SET Adresse = $adresse,
+                Status = $status,
+                SubnetId = $subnetId
             WHERE Id = $id;";
 
-        command.Parameters.AddWithValue("$titel", ipAdresse.Titel);
-        command.Parameters.AddWithValue("$erledigt", ipAdresse.Erledigt);
-        command.Parameters.AddWithValue("$projektId", ipAdresse.ProjektId);
+        command.Parameters.AddWithValue("$adresse", ipAdresse.Adresse);
+        command.Parameters.AddWithValue("$status", (int)ipAdresse.Status);
+        command.Parameters.AddWithValue("$subnetId", ipAdresse.SubnetId);
         command.Parameters.AddWithValue("$id", ipAdresse.Id);
         command.ExecuteNonQuery();
     }
 
-    public void UpdateStatus(int id, int neuerStatus)
+    public void UpdateStatus(int id, IpStatus neuerStatus)
     {
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = @"
             UPDATE IPAdresse
-            SET Erledigt = $status
+            SET Status = $status
             WHERE Id = $id;";
 
-        command.Parameters.AddWithValue("$status", neuerStatus);
+        command.Parameters.AddWithValue("$status", (int)neuerStatus);
         command.Parameters.AddWithValue("$id", id);
         command.ExecuteNonQuery();
     }
 
     public void Delete(int id)
     {
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM IPAdresse WHERE Id = $id;";
         command.Parameters.AddWithValue("$id", id);
