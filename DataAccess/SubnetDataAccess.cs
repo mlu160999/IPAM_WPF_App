@@ -1,29 +1,14 @@
 using IPAM_WPF_App.Models;
-using Microsoft.Data.Sqlite;
 
 namespace IPAM_WPF_App.DataAccess;
 
-public class SubnetRepository
+public class SubnetDataAccess
 {
-    private const string ConnectionString = "Data Source=app.db";
-
-    private static SqliteConnection CreateOpenConnection()
-    {
-        var connection = new SqliteConnection(ConnectionString);
-        connection.Open();
-
-        using var pragmaCommand = connection.CreateCommand();
-        pragmaCommand.CommandText = "PRAGMA foreign_keys = ON;";
-        pragmaCommand.ExecuteNonQuery();
-
-        return connection;
-    }
-
     public List<Subnet> GetAll()
     {
         var subnets = new List<Subnet>();
 
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = @"
             SELECT Id, Name, Beschreibung, Erstellt
@@ -37,7 +22,9 @@ public class SubnetRepository
             {
                 Id = reader.GetInt32(0),
                 Name = reader.GetString(1),
-                Beschreibung = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                Beschreibung = reader.IsDBNull(2)
+                    ? string.Empty
+                    : reader.GetString(2),
                 Erstellt = reader.GetString(3)
             });
         }
@@ -47,7 +34,7 @@ public class SubnetRepository
 
     public int Add(string name, string beschreibung)
     {
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = @"
             INSERT INTO Subnet (Name, Beschreibung, Erstellt)
@@ -56,14 +43,16 @@ public class SubnetRepository
 
         command.Parameters.AddWithValue("$name", name);
         command.Parameters.AddWithValue("$beschreibung", beschreibung);
-        command.Parameters.AddWithValue("$erstellt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue(
+            "$erstellt",
+            DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
         return Convert.ToInt32((long)command.ExecuteScalar()!);
     }
 
     public void Update(Subnet subnet)
     {
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = @"
             UPDATE Subnet
@@ -79,7 +68,7 @@ public class SubnetRepository
 
     public void Delete(int id)
     {
-        using var connection = CreateOpenConnection();
+        using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM Subnet WHERE Id = $id;";
         command.Parameters.AddWithValue("$id", id);

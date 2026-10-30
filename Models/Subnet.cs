@@ -1,5 +1,3 @@
-using Microsoft.Data.Sqlite;
-
 namespace IPAM_WPF_App.Models;
 
 public class Subnet
