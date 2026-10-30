@@ -1,6 +1,6 @@
 using Microsoft.Data.Sqlite;
 
-namespace IPAM_WPF_App;
+namespace IPAM_WPF_App.Models;
 
 public class IPAdresse
 {

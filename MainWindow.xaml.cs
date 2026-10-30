@@ -2,6 +2,8 @@ using Microsoft.Data.Sqlite;
 using System.Net;
 using System.Windows;
 using System.Windows.Controls;
+using IPAM_WPF_App.DataAccess;
+using IPAM_WPF_App.Models;
 
 namespace IPAM_WPF_App;
 
@@ -122,7 +124,7 @@ public partial class MainWindow : Window
 
         try
         {
-            _ipAdresseRepository.Add(ipText, subnet.Id);
+            _ipAdresseRepository.TryAdd(ipText, subnet.Id);
             IpAdresseTextBox.Clear();
             LoadIpAdressen(subnet.Id);
         }

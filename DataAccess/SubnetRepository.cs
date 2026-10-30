@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace IPAM_WPF_App.DataAccess;
 
-public class SubnetDataAccess
+public class SubnetRepository
 {
     private const string ConnectionString = "Data Source=app.db";
 
