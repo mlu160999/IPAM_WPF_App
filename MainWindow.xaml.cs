@@ -1,3 +1,4 @@
+using IPAM_WPF_App.Dtos;
 using IPAM_WPF_App.Models;
 using IPAM_WPF_App.Services;
 using System.Windows;
@@ -7,19 +8,18 @@ namespace IPAM_WPF_App;
 
 public partial class MainWindow : Window
 {
-    private readonly ApplicationService _applicationService;
     private readonly SubnetService _subnetService;
     private readonly IPAdresseService _ipAdresseService;
 
-    public MainWindow()
+    public MainWindow(
+        SubnetService subnetService,
+        IPAdresseService ipAdresseService)
     {
         InitializeComponent();
 
-        _applicationService = new ApplicationService();
-        _subnetService = new SubnetService();
-        _ipAdresseService = new IPAdresseService();
+        _subnetService = subnetService;
+        _ipAdresseService = ipAdresseService;
 
-        _applicationService.InitializeDatabase();
         LoadSubnets();
     }
 
@@ -179,7 +179,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (IpAdresseDataGrid.SelectedItem is not IPAdresse ipAdresse)
+        if (IpAdresseDataGrid.SelectedItem is not IPAdresseDto ipAdresse)
         {
             MessageBox.Show(
                 "Bitte zuerst eine IP-Adresse auswählen.",
@@ -189,7 +189,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        _ipAdresseService.AdvanceStatus(ipAdresse);
+        _ipAdresseService.AdvanceStatus(ipAdresse.Id);
         LoadIpAdressen(subnet.Id);
     }
 
@@ -207,7 +207,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (IpAdresseDataGrid.SelectedItem is not IPAdresse ipAdresse)
+        if (IpAdresseDataGrid.SelectedItem is not IPAdresseDto ipAdresse)
         {
             MessageBox.Show(
                 "Bitte zuerst eine IP-Adresse auswählen.",
