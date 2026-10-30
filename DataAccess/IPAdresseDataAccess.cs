@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace IPAM_WPF_App.DataAccess;
 
-public class IpAdresseDataAccess
+public class IPAdresseDataAccess
 {
     public List<IPAdresse> GetBySubnetId(int subnetId)
     {
@@ -25,7 +25,7 @@ public class IpAdresseDataAccess
             {
                 Id = reader.GetInt32(0),
                 Adresse = reader.GetString(1),
-                Status = (IpStatus)reader.GetInt32(2),
+                Status = (IPStatus)reader.GetInt32(2),
                 SubnetId = reader.GetInt32(3)
             });
         }
@@ -44,7 +44,7 @@ public class IpAdresseDataAccess
                 VALUES ($adresse, $status, $subnetId);";
 
             command.Parameters.AddWithValue("$adresse", adresse);
-            command.Parameters.AddWithValue("$status", (int)IpStatus.Frei);
+            command.Parameters.AddWithValue("$status", (int)IPStatus.Frei);
             command.Parameters.AddWithValue("$subnetId", subnetId);
             command.ExecuteNonQuery();
             return true;
@@ -73,7 +73,7 @@ public class IpAdresseDataAccess
         command.ExecuteNonQuery();
     }
 
-    public void UpdateStatus(int id, IpStatus neuerStatus)
+    public void UpdateStatus(int id, IPStatus neuerStatus)
     {
         using var connection = DbInitializer.CreateOpenConnection();
         using var command = connection.CreateCommand();
