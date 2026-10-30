@@ -58,45 +58,50 @@ Ein Subnetz kann mehrere IP-Adressen enthalten. Eine IP-Adresse gehört jeweils 
 | Feld | Typ | Beschreibung |
 |---|---|---|
 | Id | INTEGER | Primärschlüssel |
-| Titel | TEXT | IP-Adresse bzw. Bezeichnung |
-| Erledigt | INTEGER | Status |
-| ProjektId | INTEGER | Fremdschlüssel zum Subnetz |
+| Adresse | TEXT | IP-Adresse (IPv4 oder IPv6) |
+| Status | INTEGER | 0 = Frei, 1 = Reserviert, 2 = Zugewiesen (Enum `IpStatus`) |
+| SubnetId | INTEGER | Fremdschlüssel zum Subnetz |
 
 ## Projektstruktur
 
 ```text
 IPAM_WPF_App/
-├── App.xaml
-├── App.xaml.cs
-├── DbInitializer.cs
-├── IPAdresseRepository.cs
+├── DataAccess/
+│   ├── DbInitializer.cs
+│   ├── IPAdresseDataAccess.cs
+│   └── SubnetDataAccess.cs
+├── Models/
+│   ├── IPAdresse.cs
+│   ├── IpStatus.cs
+│   └── Subnet.cs
+├── Services/
+│   ├── ApplicationService.cs
+│   ├── IPAdresseService.cs
+│   └── SubnetService.cs
+├── App.xaml / App.xaml.cs
+├── MainWindow.xaml / MainWindow.xaml.cs
 ├── IPAM_WPF_App.csproj
-├── MainWindow.xaml
-├── MainWindow.xaml.cs
-├── SubnetRepository.cs
+├── K1_Schichtenarchitektur_Git_Aenderungen.md
 ├── KI_Gestuetzte_Apperstellung_V0.1.md
 └── README.md
 ```
 
 ### Wichtige Dateien
 
-**MainWindow.xaml**  
-Enthält die grafische Benutzeroberfläche der Anwendung.
+**MainWindow.xaml / MainWindow.xaml.cs**  
+Grafische Benutzeroberfläche und Code-Behind. Das Code-Behind nimmt nur Benutzeraktionen entgegen und ruft die Services auf – kein SQL, kein direkter Datenbankzugriff.
 
-**MainWindow.xaml.cs**  
-Enthält die Code-Behind-Logik für Benutzeraktionen und die Kommunikation mit den Repositories.
+**Services/**  
+Business-Logik: Eingabeprüfung, IP-Validierung, Status-Workflow. `SubnetService` und `IPAdresseService` rufen die DataAccess-Klassen auf, `ApplicationService` initialisiert die Datenbank.
 
-**DbInitializer.cs**  
-Initialisiert die SQLite-Datenbank und erstellt die benötigten Tabellen.
+**DataAccess/**  
+Direkte SQL-Abfragen mit `Microsoft.Data.Sqlite`. `DbInitializer` erstellt die Tabellen und stellt den zentralen Connection-String bereit.
 
-**SubnetRepository.cs**  
-Enthält die direkten SQL-Abfragen für die Verwaltung der Subnetze.
-
-**IPAdresseRepository.cs**  
-Enthält die direkten SQL-Abfragen für die Verwaltung der IP-Adressen.
+**Models/**  
+Reine Datenklassen `Subnet` und `IPAdresse` sowie das Enum `IpStatus`.
 
 **App.xaml / App.xaml.cs**  
-Enthalten die grundlegende WPF-Anwendungskonfiguration.
+Grundlegende WPF-Anwendungskonfiguration.
 
 ## Datenbankzugriff
 
@@ -144,23 +149,19 @@ Der grundlegende Ablauf ist:
 
 ## Architektur
 
-Die Anwendung verwendet eine einfache **WPF-Code-Behind-Architektur**.
-
-Die Verantwortlichkeiten sind trotzdem auf mehrere Dateien verteilt:
+Seit K1 verwendet die Anwendung eine **Schichtenarchitektur**. Jede Schicht kennt nur die direkt darunterliegende:
 
 ```text
-Benutzeroberfläche
+Benutzeroberfläche (MainWindow.xaml.cs)
       ↓
-MainWindow.xaml.cs
+Services (Business-Logik)
       ↓
-Repositories
+DataAccess (SQL mit Microsoft.Data.Sqlite)
       ↓
-Microsoft.Data.Sqlite
-      ↓
-SQLite-Datenbank
+SQLite-Datenbank (app.db)
 ```
 
-Damit bleibt der Datenbankzugriff von einem grossen Teil der UI-Logik getrennt, ohne MVVM oder ein ORM einzusetzen.
+Details zum Umbau stehen in `K1_Schichtenarchitektur_Git_Aenderungen.md`.
 
 ## Aktueller Stand
 
@@ -174,8 +175,6 @@ Spätere Erweiterungen können beispielsweise sein:
 
 - Excel-Import von IP-Adressen
 - Erweiterte Suche und Filter
-- Validierung von IP-Adressen
-- Erkennung von doppelten IP-Adressen
 - Zusätzliche Statuswerte
 - Verbesserte Benutzeroberfläche
 - Exportfunktionen
