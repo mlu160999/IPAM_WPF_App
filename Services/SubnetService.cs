@@ -5,16 +5,16 @@ namespace IPAM_WPF_App.Services;
 
 public class SubnetService
 {
-    private readonly SubnetDataAccess _subnetDataAccess;
+    private readonly IRepository<Subnet> _repository;
 
-    public SubnetService()
+    public SubnetService(IRepository<Subnet> repository)
     {
-        _subnetDataAccess = new SubnetDataAccess();
+        _repository = repository;
     }
 
     public List<Subnet> GetAll()
     {
-        return _subnetDataAccess.GetAll();
+        return _repository.GetAll();
     }
 
     public bool Add(string name, string beschreibung)
@@ -27,25 +27,35 @@ public class SubnetService
             return false;
         }
 
-        _subnetDataAccess.Add(name, beschreibung);
+        _repository.Add(new Subnet
+        {
+            Name = name,
+            Beschreibung = beschreibung,
+            Erstellt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        });
         return true;
     }
 
     public void Update(Subnet subnet)
     {
-        subnet.Name = subnet.Name.Trim();
-        subnet.Beschreibung = subnet.Beschreibung.Trim();
+        string name = subnet.Name.Trim();
+        string beschreibung = subnet.Beschreibung.Trim();
 
-        if (string.IsNullOrWhiteSpace(subnet.Name))
+        if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Der Subnet-Name darf nicht leer sein.");
         }
 
-        _subnetDataAccess.Update(subnet);
+        var vorhanden = _repository.GetById(subnet.Id);
+        if (vorhanden == null) return;
+
+        vorhanden.Name = name;
+        vorhanden.Beschreibung = beschreibung;
+        _repository.Update(vorhanden);
     }
 
     public void Delete(int subnetId)
     {
-        _subnetDataAccess.Delete(subnetId);
+        _repository.Delete(subnetId);
     }
 }

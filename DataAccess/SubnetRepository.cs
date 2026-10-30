@@ -2,7 +2,7 @@ using IPAM_WPF_App.Models;
 
 namespace IPAM_WPF_App.DataAccess;
 
-public class SubnetDataAccess
+public class SubnetRepository : IRepository<Subnet>
 {
     public List<Subnet> GetAll()
     {
@@ -12,31 +12,23 @@ public class SubnetDataAccess
             .ToList();
     }
 
-    public int Add(string name, string beschreibung)
+    public Subnet? GetById(int id)
     {
         using var context = new AppDbContext();
-
-        var subnet = new Subnet
-        {
-            Name = name,
-            Beschreibung = beschreibung,
-            Erstellt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-        };
-
-        context.Subnets.Add(subnet);
-        context.SaveChanges();
-
-        return subnet.Id;
+        return context.Subnets.Find(id);
     }
 
-    public void Update(Subnet subnet)
+    public void Add(Subnet entity)
     {
         using var context = new AppDbContext();
-        var vorhanden = context.Subnets.Find(subnet.Id);
-        if (vorhanden == null) return;
+        context.Subnets.Add(entity);
+        context.SaveChanges();
+    }
 
-        vorhanden.Name = subnet.Name;
-        vorhanden.Beschreibung = subnet.Beschreibung;
+    public void Update(Subnet entity)
+    {
+        using var context = new AppDbContext();
+        context.Subnets.Update(entity);
         context.SaveChanges();
     }
 

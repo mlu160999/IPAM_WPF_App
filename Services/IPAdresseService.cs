@@ -1,4 +1,5 @@
 using IPAM_WPF_App.DataAccess;
+using IPAM_WPF_App.Dtos;
 using IPAM_WPF_App.Models;
 using System.Net;
 
@@ -13,16 +14,23 @@ public enum IPAdresseAddResult
 
 public class IPAdresseService
 {
-    private readonly IPAdresseDataAccess _ipAdresseDataAccess;
+    private readonly IIPAdresseRepository _repository;
 
-    public IPAdresseService()
+    public IPAdresseService(IIPAdresseRepository repository)
     {
-        _ipAdresseDataAccess = new IPAdresseDataAccess();
+        _repository = repository;
     }
 
-    public List<IPAdresse> GetBySubnetId(int subnetId)
+    public List<IPAdresseDto> GetBySubnetId(int subnetId)
     {
-        return _ipAdresseDataAccess.GetBySubnetId(subnetId);
+        return _repository.GetBySubnetId(subnetId)
+            .Select(a => new IPAdresseDto
+            {
+                Id = a.Id,
+                Adresse = a.Adresse,
+                Status = a.Status
+            })
+            .ToList();
     }
 
     public IPAdresseAddResult Add(string ipText, int subnetId)
@@ -34,31 +42,38 @@ public class IPAdresseService
             return IPAdresseAddResult.Ungueltig;
         }
 
-        bool wurdeHinzugefuegt =
-            _ipAdresseDataAccess.TryAdd(ipText, subnetId);
-
-        if (!wurdeHinzugefuegt)
+        if (_repository.ExistsInSubnet(ipText, subnetId))
         {
             return IPAdresseAddResult.BereitsVorhanden;
         }
 
+        _repository.Add(new IPAdresse
+        {
+            Adresse = ipText,
+            Status = IPStatus.Frei,
+            SubnetId = subnetId
+        });
+
         return IPAdresseAddResult.Erfolgreich;
     }
 
-    public void AdvanceStatus(IPAdresse ipAdresse)
+    public void AdvanceStatus(int ipAdresseId)
     {
-        IPStatus neuerStatus = ipAdresse.Status switch
+        var ipAdresse = _repository.GetById(ipAdresseId);
+        if (ipAdresse == null) return;
+
+        ipAdresse.Status = ipAdresse.Status switch
         {
             IPStatus.Frei => IPStatus.Reserviert,
             IPStatus.Reserviert => IPStatus.Zugewiesen,
             _ => IPStatus.Frei
         };
 
-        _ipAdresseDataAccess.UpdateStatus(ipAdresse.Id, neuerStatus);
+        _repository.Update(ipAdresse);
     }
 
     public void Delete(int ipAdresseId)
     {
-        _ipAdresseDataAccess.Delete(ipAdresseId);
+        _repository.Delete(ipAdresseId);
     }
 }
