@@ -25,13 +25,13 @@ public class IPAdresseService
         return _ipAdresseDataAccess.GetBySubnetId(subnetId);
     }
 
-    public IpAdresseAddResult Add(string ipText, int subnetId)
+    public IPAdresseAddResult Add(string ipText, int subnetId)
     {
         ipText = ipText.Trim();
 
         if (!IPAddress.TryParse(ipText, out _))
         {
-            return IpAdresseAddResult.Ungueltig;
+            return IPAdresseAddResult.Ungueltig;
         }
 
         bool wurdeHinzugefuegt =
@@ -39,19 +39,19 @@ public class IPAdresseService
 
         if (!wurdeHinzugefuegt)
         {
-            return IpAdresseAddResult.BereitsVorhanden;
+            return IPAdresseAddResult.BereitsVorhanden;
         }
 
-        return IpAdresseAddResult.Erfolgreich;
+        return IPAdresseAddResult.Erfolgreich;
     }
 
     public void AdvanceStatus(IPAdresse ipAdresse)
     {
-        IpStatus neuerStatus = ipAdresse.Status switch
+        IPStatus neuerStatus = ipAdresse.Status switch
         {
-            IpStatus.Frei => IpStatus.Reserviert,
-            IpStatus.Reserviert => IpStatus.Zugewiesen,
-            _ => IpStatus.Frei
+            IPStatus.Frei => IPStatus.Reserviert,
+            IPStatus.Reserviert => IPStatus.Zugewiesen,
+            _ => IPStatus.Frei
         };
 
         _ipAdresseDataAccess.UpdateStatus(ipAdresse.Id, neuerStatus);
