@@ -6,72 +6,47 @@ public class SubnetDataAccess
 {
     public List<Subnet> GetAll()
     {
-        var subnets = new List<Subnet>();
-
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            SELECT Id, Name, Beschreibung, Erstellt
-            FROM Subnet
-            ORDER BY Name;";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            subnets.Add(new Subnet
-            {
-                Id = reader.GetInt32(0),
-                Name = reader.GetString(1),
-                Beschreibung = reader.IsDBNull(2)
-                    ? string.Empty
-                    : reader.GetString(2),
-                Erstellt = reader.GetString(3)
-            });
-        }
-
-        return subnets;
+        using var context = new AppDbContext();
+        return context.Subnets
+            .OrderBy(s => s.Name)
+            .ToList();
     }
 
     public int Add(string name, string beschreibung)
     {
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            INSERT INTO Subnet (Name, Beschreibung, Erstellt)
-            VALUES ($name, $beschreibung, $erstellt);
-            SELECT last_insert_rowid();";
+        using var context = new AppDbContext();
 
-        command.Parameters.AddWithValue("$name", name);
-        command.Parameters.AddWithValue("$beschreibung", beschreibung);
-        command.Parameters.AddWithValue(
-            "$erstellt",
-            DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        var subnet = new Subnet
+        {
+            Name = name,
+            Beschreibung = beschreibung,
+            Erstellt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        };
 
-        return Convert.ToInt32((long)command.ExecuteScalar()!);
+        context.Subnets.Add(subnet);
+        context.SaveChanges();
+
+        return subnet.Id;
     }
 
     public void Update(Subnet subnet)
     {
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            UPDATE Subnet
-            SET Name = $name,
-                Beschreibung = $beschreibung
-            WHERE Id = $id;";
+        using var context = new AppDbContext();
+        var vorhanden = context.Subnets.Find(subnet.Id);
+        if (vorhanden == null) return;
 
-        command.Parameters.AddWithValue("$name", subnet.Name);
-        command.Parameters.AddWithValue("$beschreibung", subnet.Beschreibung);
-        command.Parameters.AddWithValue("$id", subnet.Id);
-        command.ExecuteNonQuery();
+        vorhanden.Name = subnet.Name;
+        vorhanden.Beschreibung = subnet.Beschreibung;
+        context.SaveChanges();
     }
 
     public void Delete(int id)
     {
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM Subnet WHERE Id = $id;";
-        command.Parameters.AddWithValue("$id", id);
-        command.ExecuteNonQuery();
+        using var context = new AppDbContext();
+        var subnet = context.Subnets.Find(id);
+        if (subnet == null) return;
+
+        context.Subnets.Remove(subnet);
+        context.SaveChanges();
     }
 }

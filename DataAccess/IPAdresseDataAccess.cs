@@ -1,5 +1,4 @@
 using IPAM_WPF_App.Models;
-using Microsoft.Data.Sqlite;
 
 namespace IPAM_WPF_App.DataAccess;
 
@@ -7,92 +6,64 @@ public class IPAdresseDataAccess
 {
     public List<IPAdresse> GetBySubnetId(int subnetId)
     {
-        var addresses = new List<IPAdresse>();
-
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            SELECT Id, Adresse, Status, SubnetId
-            FROM IPAdresse
-            WHERE SubnetId = $subnetId
-            ORDER BY Adresse;";
-        command.Parameters.AddWithValue("$subnetId", subnetId);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            addresses.Add(new IPAdresse
-            {
-                Id = reader.GetInt32(0),
-                Adresse = reader.GetString(1),
-                Status = (IPStatus)reader.GetInt32(2),
-                SubnetId = reader.GetInt32(3)
-            });
-        }
-
-        return addresses;
+        using var context = new AppDbContext();
+        return context.IPAdressen
+            .Where(a => a.SubnetId == subnetId)
+            .OrderBy(a => a.Adresse)
+            .ToList();
     }
 
     public bool TryAdd(string adresse, int subnetId)
     {
-        try
-        {
-            using var connection = DbInitializer.CreateOpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = @"
-                INSERT INTO IPAdresse (Adresse, Status, SubnetId)
-                VALUES ($adresse, $status, $subnetId);";
+        using var context = new AppDbContext();
 
-            command.Parameters.AddWithValue("$adresse", adresse);
-            command.Parameters.AddWithValue("$status", (int)IPStatus.Frei);
-            command.Parameters.AddWithValue("$subnetId", subnetId);
-            command.ExecuteNonQuery();
-            return true;
-        }
-        catch (SqliteException ex) when (ex.SqliteExtendedErrorCode == 2067)
+        bool existiertBereits = context.IPAdressen
+            .Any(a => a.SubnetId == subnetId && a.Adresse == adresse);
+
+        if (existiertBereits)
         {
             return false;
         }
+
+        context.IPAdressen.Add(new IPAdresse
+        {
+            Adresse = adresse,
+            Status = IPStatus.Frei,
+            SubnetId = subnetId
+        });
+        context.SaveChanges();
+        return true;
     }
 
     public void Update(IPAdresse ipAdresse)
     {
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            UPDATE IPAdresse
-            SET Adresse = $adresse,
-                Status = $status,
-                SubnetId = $subnetId
-            WHERE Id = $id;";
+        using var context = new AppDbContext();
+        var vorhanden = context.IPAdressen.Find(ipAdresse.Id);
+        if (vorhanden == null) return;
 
-        command.Parameters.AddWithValue("$adresse", ipAdresse.Adresse);
-        command.Parameters.AddWithValue("$status", (int)ipAdresse.Status);
-        command.Parameters.AddWithValue("$subnetId", ipAdresse.SubnetId);
-        command.Parameters.AddWithValue("$id", ipAdresse.Id);
-        command.ExecuteNonQuery();
+        vorhanden.Adresse = ipAdresse.Adresse;
+        vorhanden.Status = ipAdresse.Status;
+        vorhanden.SubnetId = ipAdresse.SubnetId;
+        context.SaveChanges();
     }
 
     public void UpdateStatus(int id, IPStatus neuerStatus)
     {
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            UPDATE IPAdresse
-            SET Status = $status
-            WHERE Id = $id;";
+        using var context = new AppDbContext();
+        var ipAdresse = context.IPAdressen.Find(id);
+        if (ipAdresse == null) return;
 
-        command.Parameters.AddWithValue("$status", (int)neuerStatus);
-        command.Parameters.AddWithValue("$id", id);
-        command.ExecuteNonQuery();
+        ipAdresse.Status = neuerStatus;
+        context.SaveChanges();
     }
 
     public void Delete(int id)
     {
-        using var connection = DbInitializer.CreateOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM IPAdresse WHERE Id = $id;";
-        command.Parameters.AddWithValue("$id", id);
-        command.ExecuteNonQuery();
+        using var context = new AppDbContext();
+        var ipAdresse = context.IPAdressen.Find(id);
+        if (ipAdresse == null) return;
+
+        context.IPAdressen.Remove(ipAdresse);
+        context.SaveChanges();
     }
 }
