@@ -136,13 +136,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        IpAdresseAddResult result = _ipAdresseService.Add(
+        IPAdresseAddResult result = _ipAdresseService.Add(
             IpAdresseTextBox.Text,
             subnet.Id);
 
         switch (result)
         {
-            case IpAdresseAddResult.Ungueltig:
+            case IPAdresseAddResult.Ungueltig:
                 MessageBox.Show(
                     "Bitte eine gültige IPv4- oder IPv6-Adresse eingeben.",
                     "Ungültige IP-Adresse",
@@ -150,7 +150,7 @@ public partial class MainWindow : Window
                     MessageBoxImage.Warning);
                 return;
 
-            case IpAdresseAddResult.BereitsVorhanden:
+            case IPAdresseAddResult.BereitsVorhanden:
                 MessageBox.Show(
                     "Diese IP-Adresse existiert in diesem Subnet bereits.",
                     "Doppelter Eintrag",
@@ -158,7 +158,7 @@ public partial class MainWindow : Window
                     MessageBoxImage.Warning);
                 return;
 
-            case IpAdresseAddResult.Erfolgreich:
+            case IPAdresseAddResult.Erfolgreich:
                 IpAdresseTextBox.Clear();
                 LoadIpAdressen(subnet.Id);
                 break;
