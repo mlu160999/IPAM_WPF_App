@@ -16,12 +16,12 @@ Das Projekt wurde im Rahmen einer Schulaufgabe erstellt und wird schrittweise er
 - WPF (Windows Presentation Foundation)
 - .NET 10
 - SQLite
-- Microsoft.Data.Sqlite
-- Direkte SQL-Abfragen
+- Entity Framework Core 10 (ORM, SQLite-Provider)
+- LINQ
 - Code-Behind
 - Git / GitHub
 
-> Das Projekt verwendet bewusst **kein MVVM**, **kein Entity Framework** und **kein ORM**.
+> Das Projekt verwendet bewusst **kein MVVM**. Seit K2 erfolgt der Datenzugriff über **Entity Framework Core** statt über direkte SQL-Abfragen.
 
 ## Funktionen
 
@@ -59,7 +59,7 @@ Ein Subnetz kann mehrere IP-Adressen enthalten. Eine IP-Adresse gehört jeweils 
 |---|---|---|
 | Id | INTEGER | Primärschlüssel |
 | Adresse | TEXT | IP-Adresse (IPv4 oder IPv6) |
-| Status | INTEGER | 0 = Frei, 1 = Reserviert, 2 = Zugewiesen (Enum `IpStatus`) |
+| Status | INTEGER | 0 = Frei, 1 = Reserviert, 2 = Zugewiesen (Enum `IPStatus`) |
 | SubnetId | INTEGER | Fremdschlüssel zum Subnetz |
 
 ## Projektstruktur
@@ -67,12 +67,19 @@ Ein Subnetz kann mehrere IP-Adressen enthalten. Eine IP-Adresse gehört jeweils 
 ```text
 IPAM_WPF_App/
 ├── DataAccess/
+│   ├── AppDbContext.cs
 │   ├── DbInitializer.cs
 │   ├── IPAdresseDataAccess.cs
 │   └── SubnetDataAccess.cs
+├── Doku/
+│   ├── K0 Ki gestützte apperstellung 0.1.md
+│   ├── K1 schichtenarchitektur git aenderungen.md
+│   └── K2 ORM Entity Framework Core.md
+├── Migrations/
+│   └── (von EF Core generierte Migrations)
 ├── Models/
 │   ├── IPAdresse.cs
-│   ├── IpStatus.cs
+│   ├── IPStatus.cs
 │   └── Subnet.cs
 ├── Services/
 │   ├── ApplicationService.cs
@@ -81,8 +88,7 @@ IPAM_WPF_App/
 ├── App.xaml / App.xaml.cs
 ├── MainWindow.xaml / MainWindow.xaml.cs
 ├── IPAM_WPF_App.csproj
-├── K1_Schichtenarchitektur_Git_Aenderungen.md
-├── KI_Gestuetzte_Apperstellung_V0.1.md
+├── IPAM_WPF_App.slnx
 └── README.md
 ```
 
@@ -95,27 +101,36 @@ Grafische Benutzeroberfläche und Code-Behind. Das Code-Behind nimmt nur Benutze
 Business-Logik: Eingabeprüfung, IP-Validierung, Status-Workflow. `SubnetService` und `IPAdresseService` rufen die DataAccess-Klassen auf, `ApplicationService` initialisiert die Datenbank.
 
 **DataAccess/**  
-Direkte SQL-Abfragen mit `Microsoft.Data.Sqlite`. `DbInitializer` erstellt die Tabellen und stellt den zentralen Connection-String bereit.
+Datenzugriff mit Entity Framework Core. `AppDbContext` enthält die `DbSet`s, den Connection-String und die Konfiguration der Tabellen. `DbInitializer` wendet beim Start die Migrations an. `SubnetDataAccess` und `IPAdresseDataAccess` arbeiten mit LINQ.
+
+**Migrations/**  
+Von EF Core generierter Code, der die Datenbank aus den Entity-Klassen erstellt (`InitialDbCreation`).
 
 **Models/**  
-Reine Datenklassen `Subnet` und `IPAdresse` sowie das Enum `IpStatus`.
+Entity-Klassen `Subnet` und `IPAdresse` (mit Navigation Properties für die 1:n-Beziehung) sowie das Enum `IPStatus`.
 
 **App.xaml / App.xaml.cs**  
 Grundlegende WPF-Anwendungskonfiguration.
 
 ## Datenbankzugriff
 
-Der Zugriff auf SQLite erfolgt direkt mit `Microsoft.Data.Sqlite`.
-
-Verwendet werden unter anderem:
+Der Zugriff auf SQLite erfolgt über **Entity Framework Core** (ORM). Statt SQL-Strings werden C#-Objekte und LINQ verwendet, EF Core übersetzt diese in SQL:
 
 ```csharp
-SqliteConnection
-SqliteCommand
-SqliteDataReader
+using var context = new AppDbContext();
+return context.IPAdressen
+    .Where(a => a.SubnetId == subnetId)
+    .OrderBy(a => a.Adresse)
+    .ToList();
 ```
 
-Dadurch werden die SQL-Abfragen direkt im C#-Code ausgeführt.
+Die Datenbank wird über **Migrations** aus den Entity-Klassen erzeugt. Beim Start ruft die App `context.Database.Migrate()` auf und erstellt bzw. aktualisiert die Datei `app.db` automatisch.
+
+Neue Migration nach einer Änderung an den Entity-Klassen (Paket-Manager-Konsole):
+
+```text
+Add-Migration <SprechenderName>
+```
 
 ## Anwendung starten
 
@@ -128,12 +143,14 @@ Dadurch werden die SQL-Abfragen direkt im C#-Code ausgeführt.
 ### Start
 
 1. Repository klonen oder als ZIP herunterladen.
-2. `IPAM_WPF_App.csproj` in Visual Studio öffnen.
+2. `IPAM_WPF_App.slnx` in Visual Studio öffnen (nicht nur den Ordner, sonst werden die NuGet-Pakete nicht geladen).
 3. NuGet-Pakete wiederherstellen.
 4. Projekt kompilieren.
 5. Anwendung mit **Start** oder `F5` ausführen.
 
-Beim ersten Start wird die benötigte SQLite-Datenbank automatisch initialisiert.
+Beim ersten Start wird die SQLite-Datenbank automatisch aus den Migrations erstellt.
+
+> Eine `app.db` aus der Zeit vor K2 (mit SQL erstellt) muss vorher aus `bin\Debug\net10.0-windows\` gelöscht werden.
 
 ## Bedienung
 
@@ -156,12 +173,14 @@ Benutzeroberfläche (MainWindow.xaml.cs)
       ↓
 Services (Business-Logik)
       ↓
-DataAccess (SQL mit Microsoft.Data.Sqlite)
+DataAccess (LINQ)
+      ↓
+AppDbContext (Entity Framework Core)
       ↓
 SQLite-Datenbank (app.db)
 ```
 
-Details zum Umbau stehen in `K1_Schichtenarchitektur_Git_Aenderungen.md`.
+Details zu den Umbauten stehen im Ordner `Doku/` (K1: Schichtenarchitektur, K2: Entity Framework Core).
 
 ## Aktueller Stand
 
@@ -181,9 +200,11 @@ Spätere Erweiterungen können beispielsweise sein:
 
 ## Dokumentation
 
-Zusätzliche Informationen zur KI-gestützten Erstellung und Bearbeitung des Projekts befinden sich in:
+Die Dokumentation zu den einzelnen Kapiteln befindet sich im Ordner `Doku/`:
 
-`KI_Gestuetzte_Apperstellung_V0.1.md`
+- `K0 Ki gestützte apperstellung 0.1.md`: KI-gestützte Erstellung der App (K0) und KI-Protokoll
+- `K1 schichtenarchitektur git aenderungen.md`: Umbau in die Schichtenarchitektur
+- `K2 ORM Entity Framework Core.md`: Umstellung auf Entity Framework Core
 
 ## Autor
 

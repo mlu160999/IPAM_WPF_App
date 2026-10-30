@@ -6,4 +6,6 @@ public class Subnet
     public string Name { get; set; } = string.Empty;
     public string Beschreibung { get; set; } = string.Empty;
     public string Erstellt { get; set; } = string.Empty;
+
+    public ICollection<IPAdresse> IPAdressen { get; set; } = new List<IPAdresse>();
 }
