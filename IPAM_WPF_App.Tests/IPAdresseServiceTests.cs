@@ -87,6 +87,22 @@ public class IPAdresseServiceTests
     }
 
     [Fact]
+    public void Add_DuplikatMitLeerzeichen_GibtBereitsVorhandenZurueckUndSpeichertNichts()
+    {
+        // Arrange
+        var repository = new FakeIPAdresseRepository(
+            new IPAdresse { Adresse = "10.10.10.25", SubnetId = SubnetId });
+        var service = new IPAdresseService(repository);
+
+        // Act
+        var resultat = service.Add("  10.10.10.25  ", SubnetId);
+
+        // Assert
+        Assert.Equal(IPAdresseAddResult.BereitsVorhanden, resultat);
+        Assert.Single(repository.GespeicherteIPAdressen);
+    }
+
+    [Fact]
     public void Add_GleicheAdresseInAnderemSubnet_GibtErfolgreichZurueck()
     {
         // Arrange

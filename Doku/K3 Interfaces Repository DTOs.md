@@ -1,18 +1,49 @@
-# K3 -- Interfaces, Repository-Pattern und DTOs
+# MODUL PROG1 – K3: Interfaces, Repository-Pattern und DTOs
+
+**Projekt:** IPAM_WPF_App\
+**Autoren:** Madalina Luca, Muzamil Abukar Haji Ali, Sabri Mahdi\
+**Branch:** `feature/k3-repository-dto` → `master` (Pull Request #4)
+
+## Inhaltsverzeichnis
+
+1.  [Ziel](#ziel)
+2.  [Drei neue Begriffe](#drei-neue-begriffe)
+3.  [Projektstruktur nach K3](#projektstruktur-nach-k3)
+4.  [Welche Klasse macht was?](#welche-klasse-macht-was)
+5.  [B1 – Interfaces](#b1--interfaces)
+6.  [B2 – Repositories und Konstruktor-Injection](#b2--repositories-und-konstruktor-injection)
+7.  [B3 – DTOs](#b3--dtos)
+8.  [Ablauf: Klick auf «Status weiter»](#ablauf-klick-auf-status-weiter)
+9.  [Übersicht: Serviceklasse → Repository](#übersicht-serviceklasse--repository)
+10. [B4 – Kontrolle](#b4--kontrolle)
+11. [Git](#git)
+12. [Stolpersteine](#stolpersteine)
+13. [KI-Protokoll K3](#ki-protokoll-k3)
+14. [Reflexion](#reflexion)
 
 ## Ziel
 
-Über den bestehenden EF-Core-Code (K2) wurde eine zusätzliche, formale
-Ebene eingeführt:
+Bis K2 erstellt jeder Service seine DataAccess-Klasse selbst mit `new`.
+Damit ist er fest an EF Core und die echte Datenbank gebunden. In K3
+wird diese feste Bindung gelöst:
 
--   **Interfaces** als Kontrakt für den Datenzugriff (`IRepository<T>`)
--   **Repository-Klassen** statt DataAccess-Klassen
--   **Konstruktor-Injection**: Die Services kennen nur noch Interfaces
--   **DTOs** dort, wo die Entity nicht das ist, was die UI braucht
+-   Die Services kennen nur noch ein **Interface**, nicht die konkrete
+    Klasse.
+-   Die DataAccess-Klassen werden zu **Repositories**.
+-   Die UI bekommt bei den IP-Adressen nur noch die Daten, die sie
+    wirklich braucht (**DTO**).
 
-Die Funktionalität der App bleibt gleich.
+Für den Benutzer ändert sich nichts. Die Datenbank ändert sich auch
+nicht, es braucht **keine neue Migration**.
 
-**UI → Services → IRepository (Interface) → Repository (EF Core) → SQLite**
+## Drei neue Begriffe
+
+| Begriff | Einfach erklärt |
+|---|---|
+| **Interface** | Ein Vertrag: «Wer mich implementiert, hat diese Methoden.» Es sagt nur **was**, nicht **wie**. |
+| **Repository** | Eine Klasse, die nur Daten liest und speichert (CRUD). Keine Regeln, keine Logik. |
+| **Dependency Injection (DI)** | Eine Klasse erstellt ihre Hilfsklassen nicht selbst, sondern bekommt sie **von aussen** über den Konstruktor. |
+| **DTO** (Data Transfer Object) | Eine schlanke Klasse nur für die Anzeige, mit genau den Feldern, die die UI braucht. |
 
 ## Projektstruktur nach K3
 
@@ -27,23 +58,31 @@ IPAM_WPF_App/
 │   └── IPAdresseRepository.cs      (neu, ersetzt IPAdresseDataAccess.cs)
 ├── Dtos/
 │   └── IPAdresseDto.cs             (neu)
-├── Migrations/                     (unverändert, keine neue Migration nötig)
-├── Models/                         (unverändert)
-│   ├── IPAdresse.cs
-│   ├── IPStatus.cs
-│   └── Subnet.cs
 ├── Services/
-│   ├── ApplicationService.cs       (unverändert)
+│   ├── ApplicationService.cs
 │   ├── IPAdresseService.cs         (geändert)
 │   └── SubnetService.cs            (geändert)
-├── App.xaml / App.xaml.cs          (geändert, Composition Root)
-└── MainWindow.xaml / .xaml.cs      (Code-Behind geändert)
+├── Models/                         (unverändert)
+├── Migrations/                     (unverändert)
+├── App.xaml / App.xaml.cs          (geändert)
+└── MainWindow.xaml.cs              (geändert)
 ```
 
-Die Datenbank ändert sich in K3 nicht. Deshalb ist **keine neue
-Migration** nötig.
+## Welche Klasse macht was?
 
-## B1 -- Interface definieren
+| Klasse | Schicht | Aufgabe |
+|---|---|---|
+| `App.xaml.cs` | Start | **Composition Root**: Die einzige Stelle, die alle konkreten Klassen kennt. Erstellt Repositories, Services und das Hauptfenster und steckt sie zusammen. |
+| `MainWindow.xaml.cs` | UI | Bekommt die Services über den Konstruktor. Arbeitet bei IP-Adressen mit `IPAdresseDto`. |
+| `SubnetService` | Service | Regeln für Subnetze. Setzt jetzt auch das Erstelldatum. Kennt nur `IRepository<Subnet>`. |
+| `IPAdresseService` | Service | Regeln für IP-Adressen: Validierung, Duplikatprüfung, Status-Workflow. Wandelt Entities in DTOs um. Kennt nur `IIPAdresseRepository`. |
+| `IRepository<T>` | DataAccess | Vertrag für die fünf Standard-Operationen einer Entity |
+| `IIPAdresseRepository` | DataAccess | Erweitert den Vertrag um zwei Abfragen speziell für IP-Adressen |
+| `SubnetRepository` | DataAccess | Erfüllt `IRepository<Subnet>` mit EF Core |
+| `IPAdresseRepository` | DataAccess | Erfüllt `IIPAdresseRepository` mit EF Core |
+| `IPAdresseDto` | Dtos | Nur `Id`, `Adresse`, `Status` für die Anzeige |
+
+## B1 – Interfaces
 
 ### `IRepository<T>`
 
@@ -58,17 +97,15 @@ public interface IRepository<T>
 }
 ```
 
-Ein Interface beschreibt nur, **was** eine Klasse können muss
-(Kontrakt), nicht **wie** sie es macht (Implementierung). `T` ist ein
-Platzhalter für die Entity, z. B. `IRepository<Subnet>`.
+`T` ist ein Platzhalter. `IRepository<Subnet>` bedeutet: dieselben fünf
+Methoden, aber für Subnetze.
 
 ### Reichen die fünf Methoden für alle Entitäten? (B1.2)
 
--   **Subnet:** Ja. Die App braucht nur Standard-CRUD.
--   **IPAdresse:** Nein. Die App zeigt IP-Adressen immer **pro Subnet**
-    an und muss **Duplikate** pro Subnet erkennen. Dafür gibt es ein
-    eigenes Interface, das die fünf Standard-Methoden erbt und zwei
-    spezifische ergänzt:
+-   **Subnet: Ja.** Die App braucht nur Standard-CRUD.
+-   **IPAdresse: Nein.** Die App zeigt IP-Adressen immer **pro Subnet**
+    an und muss **Duplikate** erkennen. Deshalb gibt es ein eigenes
+    Interface, das die fünf Methoden erbt und zwei ergänzt:
 
 ``` csharp
 public interface IIPAdresseRepository : IRepository<IPAdresse>
@@ -78,44 +115,32 @@ public interface IIPAdresseRepository : IRepository<IPAdresse>
 }
 ```
 
-So bleibt der Service an ein Interface gebunden (nicht an die konkrete
-Klasse) und hat trotzdem die Methoden, die er braucht.
+## B2 – Repositories und Konstruktor-Injection
 
-## B2 -- DataAccess zu Repository machen
-
-### Repository-Klassen
+### DataAccess → Repository
 
 | Vorher (K2) | Nachher (K3) | Implementiert |
 |---|---|---|
 | `SubnetDataAccess` | `SubnetRepository` | `IRepository<Subnet>` |
 | `IPAdresseDataAccess` | `IPAdresseRepository` | `IIPAdresseRepository` |
 
-Der EF-Core-Code (`AppDbContext`, LINQ, `SaveChanges`) ist praktisch
-gleich geblieben. Geändert hat sich, **welche** Methoden es gibt:
+Der EF-Core-Code ist praktisch gleich geblieben. Geändert hat sich,
+**welche Methoden** es gibt. Alle Regeln sind aus den Repositories in
+die Services gewandert:
 
-| Vorher (DataAccess) | Nachher (Repository) | Grund |
+| Vorher | Nachher | Warum |
 |---|---|---|
-| `SubnetDataAccess.Add(name, beschreibung)` | `SubnetRepository.Add(Subnet entity)` | Einheitliche Signatur aus `IRepository<T>` |
-| `IPAdresseDataAccess.TryAdd(adresse, subnetId)` | `ExistsInSubnet(...)` + `Add(IPAdresse entity)` | Die Duplikat-Prüfung ist eine Geschäftsregel und gehört in den Service |
-| `IPAdresseDataAccess.UpdateStatus(id, status)` | `GetById(id)` + `Update(entity)` | Der Status-Workflow gehört in den Service; das Repository macht nur CRUD |
-| -- | `GetById(int id)` | Neu aus `IRepository<T>` |
+| `SubnetDataAccess.Add(name, beschreibung)` setzt das Datum selbst | `SubnetRepository.Add(subnet)`. Das Datum setzt der `SubnetService`. | Einheitliche Methode aus dem Interface. Das Erstelldatum ist eine Regel und gehört in den Service. |
+| `IPAdresseDataAccess.TryAdd(...)` prüft Duplikate | Service ruft `ExistsInSubnet(...)` und dann `Add(...)` auf | «Keine doppelte IP pro Subnet» ist eine Geschäftsregel |
+| `IPAdresseDataAccess.UpdateStatus(id, status)` | Service ruft `GetById(id)` auf, ändert den Status und ruft `Update(...)` auf | Der Status-Workflow gehört in den Service. Das Repository macht nur CRUD. |
 
-**Grundsatz:** Das Repository enthält nur noch reinen Datenzugriff
-(CRUD). Alle Regeln (Duplikate, Status-Workflow, Erstelldatum,
-Eingabeprüfung) liegen im Service.
-
-### Konstruktor-Injection in den Services
-
-Vorher hat jeder Service seine DataAccess-Klasse selbst erstellt:
+### Konstruktor-Injection
 
 ``` csharp
+// Vorher (K2): Service erstellt die Klasse selbst
 private readonly SubnetDataAccess _subnetDataAccess = new SubnetDataAccess();
-```
 
-Jetzt bekommt der Service das Repository **von aussen** und speichert
-es als **Interface-Typ**:
-
-``` csharp
+// Nachher (K3): Service bekommt ein Interface von aussen
 private readonly IRepository<Subnet> _repository;
 
 public SubnetService(IRepository<Subnet> repository)
@@ -124,50 +149,37 @@ public SubnetService(IRepository<Subnet> repository)
 }
 ```
 
-Damit kennt der `SubnetService` die Klasse `SubnetRepository` gar nicht
-mehr. Für Tests (K4) kann später eine andere Klasse übergeben werden,
-die dasselbe Interface implementiert, z. B. ein Repository mit
-Testdaten ohne echte Datenbank.
+**Warum?** Der `SubnetService` weiss nicht mehr, ob dahinter EF Core,
+eine andere Datenbank oder eine Testklasse steckt. In K4 nutzen wir
+das: Die Unit Tests übergeben ein Fake-Repository ohne Datenbank.
 
-### Composition Root in `App.xaml.cs`
+### Composition Root (`App.xaml.cs`)
 
-Irgendwo müssen die konkreten Klassen trotzdem erstellt und
-zusammengesteckt werden. Diese Stelle heisst **Composition Root** und
-ist bei uns `App.xaml.cs`:
+Irgendwo müssen die konkreten Klassen doch erstellt werden. Diese
+Stelle heisst **Composition Root**:
 
 ``` csharp
-protected override void OnStartup(StartupEventArgs e)
-{
-    base.OnStartup(e);
+var subnetService = new SubnetService(new SubnetRepository());
+var ipAdresseService = new IPAdresseService(new IPAdresseRepository());
 
-    var applicationService = new ApplicationService();
-    applicationService.InitializeDatabase();
-
-    var subnetService = new SubnetService(new SubnetRepository());
-    var ipAdresseService = new IPAdresseService(new IPAdresseRepository());
-
-    var mainWindow = new MainWindow(subnetService, ipAdresseService);
-    mainWindow.Show();
-}
+var mainWindow = new MainWindow(subnetService, ipAdresseService);
+mainWindow.Show();
 ```
 
 -   `StartupUri="MainWindow.xaml"` wurde aus `App.xaml` entfernt, weil
     das Fenster jetzt hier mit seinen Services erstellt wird.
--   `MainWindow` bekommt die Services über den Konstruktor und kennt
-    keine Repositories.
--   Nur diese eine Stelle kennt alle konkreten Klassen. Wer z. B. das
-    Repository austauschen will, ändert nur hier eine Zeile.
+-   Will man ein Repository austauschen, ändert man nur diese Zeilen.
 
-## B3 -- DTOs einführen
+## B3 – DTOs
 
 ### Welche Entitäten brauchen ein DTO? (B3.6)
 
 | Entity | DTO? | Begründung |
 |---|---|---|
-| `IPAdresse` | **Ja**, `IPAdresseDto` | Hat einen Fremdschlüssel (`SubnetId`) und eine Navigation Property (`Subnet`), die die UI nicht braucht. Die IP-Liste zeigt nur Adresse und Status. |
-| `Subnet` | **Nein** | Die UI zeigt genau die vier einfachen Felder (`Id`, `Name`, `Beschreibung`, `Erstellt`). Die Navigation Property `IPAdressen` wird nicht geladen und nicht verwendet. Ein DTO wäre hier nur Mapping-Aufwand ohne Nutzen. |
+| `IPAdresse` | **Ja** | Enthält `SubnetId` (Fremdschlüssel) und `Subnet` (Navigation Property). Beides braucht die UI nicht. |
+| `Subnet` | **Nein** | Die UI zeigt genau die vier einfachen Felder. Ein DTO wäre nur zusätzlicher Code ohne Nutzen. |
 
-### `IPAdresseDto`
+### `IPAdresseDto` und das Mapping
 
 ``` csharp
 public class IPAdresseDto
@@ -178,45 +190,30 @@ public class IPAdresseDto
 }
 ```
 
-**Bewusst nicht übernommen:**
-
--   `SubnetId`: interner Fremdschlüssel, die UI kennt das ausgewählte
-    Subnet bereits.
--   `Subnet`: Navigation Property. Sie wäre ohne `Include()` ohnehin
-    leer und würde die UI an die Datenbankstruktur koppeln.
-
-### Mapping Entity → DTO (im Service, manuell mit LINQ)
+Die Umwandlung (**Mapping**) passiert im `IPAdresseService`, von Hand
+mit LINQ `Select` (kein AutoMapper, wie in der Aufgabe verlangt):
 
 ``` csharp
-public List<IPAdresseDto> GetBySubnetId(int subnetId)
-{
-    return _repository.GetBySubnetId(subnetId)
-        .Select(a => new IPAdresseDto
-        {
-            Id = a.Id,
-            Adresse = a.Adresse,
-            Status = a.Status
-        })
-        .ToList();
-}
+return _repository.GetBySubnetId(subnetId)
+    .Select(a => new IPAdresseDto { Id = a.Id, Adresse = a.Adresse, Status = a.Status })
+    .ToList();
 ```
 
-Kein AutoMapper, sondern manuelles Mapping mit `Select`, wie in der
-Aufgabe verlangt.
+### Anpassungen in der UI
 
-Die Gegenrichtung (Eingabe → Entity) passiert ebenfalls im Service,
-z. B. beim Hinzufügen einer IP:
-`new IPAdresse { Adresse = ipText, Status = IPStatus.Frei, SubnetId = subnetId }`.
+-   `MainWindow.xaml.cs` arbeitet bei IP-Adressen mit `IPAdresseDto`.
+-   `AdvanceStatus` bekommt nur noch die Id. Der Service lädt die Entity
+    selbst.
+-   `MainWindow.xaml` musste nicht geändert werden, weil das DTO
+    dieselben Property-Namen hat.
 
-### Anpassung UI (B3.8)
+## Ablauf: Klick auf «Status weiter»
 
--   `MainWindow.xaml.cs` arbeitet bei den IP-Adressen mit
-    `IPAdresseDto` statt `IPAdresse`.
--   `AdvanceStatus` bekommt nur noch die Id (`AdvanceStatus(int id)`)
-    statt der ganzen Entity. Der Service lädt die Entity selbst über
-    `GetById`.
--   `MainWindow.xaml` musste nicht angepasst werden, weil das DTO
-    dieselben Property-Namen (`Adresse`, `Status`) hat wie die Entity.
+1.  **UI:** ruft `_ipAdresseService.AdvanceStatus(ipAdresseDto.Id)` auf.
+2.  **Service:** `_repository.GetById(id)` (über das Interface),
+    berechnet den nächsten Status, dann `_repository.Update(ipAdresse)`.
+3.  **Repository:** `context.IPAdressen.Update(...)`, `SaveChanges()`.
+4.  **UI:** lädt die Liste neu und erhält wieder DTOs.
 
 ## Übersicht: Serviceklasse → Repository
 
@@ -225,35 +222,27 @@ z. B. beim Hinzufügen einer IP:
 | ApplicationService | InitializeDatabase() | DbInitializer.Initialize() |
 | SubnetService | GetAll() | IRepository<Subnet>.GetAll() |
 | SubnetService | Add(name, beschreibung) | IRepository<Subnet>.Add(subnet) |
-| SubnetService | Update(subnet) | IRepository<Subnet>.GetById(id) + Update(subnet) |
+| SubnetService | Update(subnet) | GetById(id) + Update(subnet) |
 | SubnetService | Delete(subnetId) | IRepository<Subnet>.Delete(id) |
-| IPAdresseService | GetBySubnetId(subnetId) | IIPAdresseRepository.GetBySubnetId(subnetId) + Mapping zu DTO |
-| IPAdresseService | Add(ipText, subnetId) | IIPAdresseRepository.ExistsInSubnet(...) + Add(ipAdresse) |
-| IPAdresseService | AdvanceStatus(ipAdresseId) | IIPAdresseRepository.GetById(id) + Update(ipAdresse) |
-| IPAdresseService | Delete(ipAdresseId) | IIPAdresseRepository.Delete(id) |
+| IPAdresseService | GetBySubnetId(subnetId) | IIPAdresseRepository.GetBySubnetId(...) + Mapping zu DTO |
+| IPAdresseService | Add(ipText, subnetId) | ExistsInSubnet(...) + Add(ipAdresse) |
+| IPAdresseService | AdvanceStatus(id) | GetById(id) + Update(ipAdresse) |
+| IPAdresseService | Delete(id) | IIPAdresseRepository.Delete(id) |
 
-Keine Serviceklasse übernimmt Datenzugriff, und kein Repository enthält
-Geschäftslogik.
+## B4 – Kontrolle
 
-## B4 -- Kontrolle
-
--   App getestet: Subnet hinzufügen/löschen, IP hinzufügen, Duplikat
-    wird erkannt, Status-Workflow Frei → Reserviert → Zugewiesen →
-    Frei, IP löschen, Cascade-Delete, Daten bleiben nach Neustart
-    erhalten. Die App verhält sich gleich wie vor dem Umbau.
--   **Kontrollfrage:** Keine Serviceklasse verwendet den konkreten Typ
-    einer Repository-Klasse. `SubnetService` speichert
-    `IRepository<Subnet>`, `IPAdresseService` speichert
-    `IIPAdresseRepository`. Konkrete Repository-Klassen werden nur in
-    `App.xaml.cs` (Composition Root) erstellt.
+-   App getestet: Sie verhält sich gleich wie vor dem Umbau.
+-   **Kontrollfrage:** Keine Serviceklasse verwendet eine konkrete
+    Repository-Klasse. `SubnetService` speichert `IRepository<Subnet>`,
+    `IPAdresseService` speichert `IIPAdresseRepository`. Konkrete
+    Repositories werden nur in `App.xaml.cs` erstellt.
 -   `MainWindow.xaml.cs` kennt keine Repositories, nur Services.
 
-## Git / GitHub
+## Git
 
-Branch: **`feature/k3-repository-dto`**
-
-Commits in Schritten (von unten nach oben durch die Schichten, damit
-der Build nach jedem Commit funktioniert):
+Branch `feature/k3-repository-dto`, gemergt über **Pull Request #4**.
+Die Commits gehen von unten nach oben durch die Schichten, damit der
+Build nach jedem Commit funktioniert:
 
 1.  `K3: Generisches Interface IRepository<T> mit CRUD-Methoden definiert`
 2.  `Rename Irepository.cs to IRepository.cs`
@@ -262,43 +251,150 @@ der Build nach jedem Commit funktioniert):
 5.  `K3: IPAdresseRepository implementiert IIPAdresseRepository`
 6.  `K3: IPAdresseDto ohne Fremdschlüssel und Navigation Property eingeführt`
 7.  `K3: Services mit Konstruktor-Injection, Composition Root und DTO im UI`
-    (Services, App.xaml, App.xaml.cs und MainWindow.xaml.cs zusammen, weil
-    die Umstellung auf Konstruktor-Injection nur gemeinsam lauffähig ist)
 8.  `K3: Alte DataAccess-Klassen entfernt`
 9.  `Merge origin/master (K2) in feature/k3-repository-dto`
 10. `K3: Ordner DTOS umbenennen (Zwischenschritt)`
 11. `K3: Ordner Dtos an Namespace angepasst`
 
-Gemergt über Pull Request #4 `feature/k3-repository-dto` → `master`.
+Commit 7 enthält fünf Dateien (beide Services, `App.xaml`,
+`App.xaml.cs`, `MainWindow.xaml.cs`). Die Umstellung auf
+Konstruktor-Injection funktioniert nur gemeinsam. Einzeln wären
+Zwischenstände entstanden, die nicht bauen oder beim Start abstürzen.
 
 ## Stolpersteine
 
--   **Branch von veraltetem `master` erstellt:** Der K3-Branch wurde
-    von einem lokalen `master` ohne die K2-Änderungen abgezweigt. Dadurch
-    fehlten `AppDbContext`, die Migrations und die Doku-Ordner-Struktur.
-    Lösung: aktuellen `master` in den Branch mergen und die zwei
-    Konflikte (alte DataAccess-Klassen) durch Löschen auflösen.
-    Erkenntnis: vor dem Erstellen eines Branches immer zuerst `master`
-    pullen.
--   **Gross-/Kleinschreibung von Datei- und Ordnernamen unter Windows:**
-    `Irepository.cs` musste in `IRepository.cs` und der Ordner `DTOS`
-    in `Dtos` umbenannt werden (passend zum Namespace
-    `IPAM_WPF_App.Dtos`). Weil Git unter Windows reine Änderungen der
-    Gross-/Kleinschreibung nicht erkennt, lief das über einen
-    Zwischennamen (`DtosTmp`) mit einem Commit dazwischen.
+| Problem | Ursache | Lösung |
+|---|---|---|
+| Build-Fehler «AppDbContext could not be found» | Der K3-Branch wurde von einem **lokalen, veralteten `master`** ohne K2 erstellt | `origin/master` in den Branch gemergt. Die zwei Konflikte (alte DataAccess-Klassen) mit «Delete File» gelöst. **Regel für uns:** vor jedem neuen Branch zuerst `master` pullen. |
+| Erster Merge-Versuch ohne Wirkung | Den lokalen statt den GitHub-`master` gemergt | Zuerst `master` gepullt, dann gemergt |
+| Ordner `DTOS` passte nicht zum Namespace `Dtos` | Schreibweise | Über den Zwischennamen `DtosTmp` umbenannt (Windows/Git erkennen reine Gross-/Kleinschreibung nicht) |
 
-## Reflexion: Wo hat sich ein DTO gelohnt, wo nicht?
+------------------------------------------------------------------------
 
--   **Gelohnt bei `IPAdresse`:** Die UI bekommt nur noch Id, Adresse und
-    Status. Fremdschlüssel und Navigation Property bleiben in der
-    DataAccess-Schicht. Ändert sich die Entity (z. B. neue Spalte),
-    muss sich die UI nicht ändern.
--   **Nicht gelohnt bei `Subnet`:** Die Entity enthält genau die Felder,
-    die die UI anzeigt. Ein DTO hätte nur zusätzlichen Mapping-Code
-    erzeugt.
+## KI-Protokoll K3
 
-## Ergebnis
+**Tool:** Claude (Anthropic)
 
-Die App funktioniert unverändert. Die Services arbeiten nur noch gegen
-Interfaces und sind damit für Unit Tests in K4 vorbereitet. Die UI
-erhält bei den IP-Adressen nur die Daten, die sie wirklich braucht.
+### Eintrag 1 – Interfaces, Repositories und DTO erstellen
+
+**Prompt / Aufgabe:**\
+«Super, ab auf K3.» (Grundlage: Aufgabenblatt K3 und `master` nach K2.)
+
+**Ergebnis der KI:**\
+Claude lieferte `IRepository<T>`, `IIPAdresseRepository`, beide
+Repositories, `IPAdresseDto`, die Services mit Konstruktor-Injection,
+`App.xaml.cs` als Composition Root und das angepasste Code-Behind.
+Dazu die Begründungen: warum ein zweites Interface für IP-Adressen,
+warum kein DTO für `Subnet`, warum die Regeln aus den Repositories in
+die Services wandern. Den Code selbst konnte Claude nicht kompilieren.
+
+**Unsere Prüfung und Umsetzung:**\
+Wir haben den Branch erstellt, die Dateien eingebaut und in Schritten
+committet. Die Antworten auf B1.2 und B3.6 haben wir mit dem
+Aufgabenblatt abgeglichen.
+
+**Erkenntnis:**\
+Nicht jede Entity braucht ein DTO. Die Entscheidung muss man pro
+Entity begründen können.
+
+### Eintrag 2 – Commit-Reihenfolge
+
+**Prompt / Aufgabe:**\
+«Kannst du mir von File zu File einen Commit-Text geben? Und in welcher
+Reihenfolge macht man das am besten?» Danach: «Kombinier den Commit für
+6, 7, 9, damit wieder ein gültiger Build hochgeladen wird» und «Macht
+man wirklich so grosse Commits?»
+
+**Ergebnis der KI:**\
+Claude schlug die Reihenfolge «von unten nach oben durch die Schichten»
+vor und markierte, nach welchen Commits der Build bricht. Bei unserem
+Kombinationsvorschlag wies Claude darauf hin, dass auch `App.xaml` und
+`App.xaml.cs` dazugehören. Sonst würde die App zwar bauen, aber beim
+Start abstürzen.
+
+**Unsere Prüfung und Umsetzung:**\
+Die Idee, die Commits zusammenzufassen, damit jeder Push lauffähig
+ist, kam von uns. Wir haben sie mit der Ergänzung um `App.xaml`
+umgesetzt.
+
+**Erkenntnis:**\
+Ein guter Commit ist eine abgeschlossene, lauffähige Änderung, egal wie
+viele Dateien er umfasst.
+
+### Eintrag 3 – Build-Fehler durch veralteten Branch
+
+**Prompt / Aufgabe:**\
+Wir haben Claude den Build-Fehler «The type or namespace name
+'AppDbContext' could not be found» geschickt und gefragt, was er
+bedeutet.
+
+**Ergebnis der KI:**\
+Claude prüfte den Branch auf GitHub. Er war von einem `master` ohne K2
+abgezweigt worden. Claude simulierte den Merge vorher und konnte so
+voraussagen, dass genau zwei Konflikte entstehen und diese durch
+Löschen zu lösen sind.
+
+**Unsere Prüfung und Umsetzung:**\
+Unser erster Merge hatte keine Wirkung, weil wir den lokalen `master`
+gemergt hatten. Das haben wir selbst bemerkt («ah, ich habe es falsch
+gemacht»). Danach haben wir den aktuellen `master` gemergt, die zwei
+Konflikte über «Delete File» gelöst, gebaut, getestet und gepusht.
+
+**Erkenntnis:**\
+Vor jedem neuen Branch zuerst `master` pullen. Und: «Lokal» und
+«auf GitHub» sind nicht automatisch derselbe Stand.
+
+### Fragen aus dem Aufgabenblatt
+
+**Welche Prompts habt ihr verwendet, um Interfaces und
+Repository-Pattern einzuführen?**\
+Wir haben Claude mit «Super, ab auf K3» auf Basis des Aufgabenblatts
+und unseres `master` beauftragt. Für die Umsetzung haben wir gefragt:
+«Kannst du mir von File zu File einen Commit-Text geben, und in welcher
+Reihenfolge macht man das am besten?» Beim Build-Fehler haben wir die
+Fehlermeldung geschickt und gefragt, was sie bedeutet.
+
+**Was hat die KI beim Mapping Entity/DTO gut gemacht, wo musstet ihr
+korrigieren?**\
+Gut: Das Mapping steht an einer Stelle im `IPAdresseService`, ist mit
+`Select` kurz und verständlich, und das DTO hat dieselben
+Property-Namen wie die Entity. Deshalb musste `MainWindow.xaml` nicht
+angepasst werden. Claude hat auch begründet, warum `Subnet` kein DTO
+braucht. Am Mapping selbst mussten wir nichts korrigieren. Die Probleme
+in K3 lagen bei Git (veralteter Branch) und bei der Schreibweise des
+Ordners (`DTOS` statt `Dtos`).
+
+**Wo wollte die KI zu schnell AutoMapper oder ähnliche Bibliotheken
+einführen, und wie habt ihr sie zurückgeholt?**\
+Das ist nicht passiert. Claude hat das Mapping von Anfang an von Hand
+mit LINQ `Select` geschrieben und dabei auf die Vorgabe im
+Aufgabenblatt verwiesen (kein AutoMapper).
+
+------------------------------------------------------------------------
+
+## Reflexion
+
+**Bei welcher Entity hat sich ein DTO klar gelohnt, bei welcher nicht?
+Warum?**
+
+-   **Gelohnt bei `IPAdresse`:** Die Entity enthält den Fremdschlüssel
+    `SubnetId` und die Navigation Property `Subnet`. Beides braucht die
+    IP-Liste nicht. Mit dem `IPAdresseDto` bekommt die UI nur `Id`,
+    `Adresse` und `Status`. Ändert sich die Entity (z. B. eine neue
+    Spalte), muss sich die UI nicht ändern.
+-   **Nicht gelohnt bei `Subnet`:** Die Entity enthält genau die vier
+    Felder, die die UI anzeigt. Die Navigation Property `IPAdressen`
+    wird nie geladen. Ein DTO hätte nur zusätzlichen Mapping-Code ohne
+    Nutzen erzeugt.
+
+**Was hat K3 sonst gebracht?**\
+Am meisten die Konstruktor-Injection. Für den Benutzer hat sich nichts
+verändert, und zuerst wirkte es wie mehr Code für dasselbe Ergebnis.
+Der Nutzen wurde erst in K4 sichtbar: Weil die Services nur
+Interfaces kennen, konnten wir sie mit Fake-Repositories ohne
+Datenbank testen.
+
+**Was wir gelernt haben:**\
+Vor jedem neuen Branch zuerst `master` pullen. Der Build-Fehler mit
+`AppDbContext` hat uns gezeigt, dass «lokal» und «auf GitHub» nicht
+automatisch derselbe Stand sind.
