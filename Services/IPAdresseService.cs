@@ -5,13 +5,9 @@ using System.Net;
 
 namespace IPAM_WPF_App.Services;
 
-public enum IPAdresseAddResult
-{
-    Erfolgreich,
-    Ungueltig,
-    BereitsVorhanden
-}
-
+/// <summary>
+/// Geschäftslogik für IP-Adressen: Validierung, Duplikatprüfung und Status-Workflow.
+/// </summary>
 public class IPAdresseService
 {
     private readonly IIPAdresseRepository _repository;
@@ -21,6 +17,11 @@ public class IPAdresseService
         _repository = repository;
     }
 
+    /// <summary>
+    /// Lädt alle IP-Adressen eines Subnets für die Anzeige.
+    /// </summary>
+    /// <param name="subnetId">Id des Subnets.</param>
+    /// <returns>Die IP-Adressen als DTOs, sortiert nach Adresse.</returns>
     public List<IPAdresseDto> GetBySubnetId(int subnetId)
     {
         return _repository.GetBySubnetId(subnetId)
@@ -33,6 +34,12 @@ public class IPAdresseService
             .ToList();
     }
 
+    /// <summary>
+    /// Fügt einem Subnet eine neue IP-Adresse mit Status Frei hinzu.
+    /// </summary>
+    /// <param name="ipText">Die eingegebene IPv4- oder IPv6-Adresse.</param>
+    /// <param name="subnetId">Id des Subnets.</param>
+    /// <returns>Ob die Adresse hinzugefügt wurde oder warum nicht.</returns>
     public IPAdresseAddResult Add(string ipText, int subnetId)
     {
         ipText = ipText.Trim();
@@ -57,10 +64,19 @@ public class IPAdresseService
         return IPAdresseAddResult.Erfolgreich;
     }
 
+    /// <summary>
+    /// Schaltet den Status einer IP-Adresse eine Stufe weiter
+    /// (Frei, Reserviert, Zugewiesen und wieder Frei).
+    /// Existiert die Id nicht, passiert nichts.
+    /// </summary>
+    /// <param name="ipAdresseId">Id der IP-Adresse.</param>
     public void AdvanceStatus(int ipAdresseId)
     {
         var ipAdresse = _repository.GetById(ipAdresseId);
-        if (ipAdresse == null) return;
+        if (ipAdresse == null)
+        {
+            return;
+        }
 
         ipAdresse.Status = ipAdresse.Status switch
         {
@@ -68,10 +84,13 @@ public class IPAdresseService
             IPStatus.Reserviert => IPStatus.Zugewiesen,
             _ => IPStatus.Frei
         };
-
         _repository.Update(ipAdresse);
     }
 
+    /// <summary>
+    /// Löscht eine IP-Adresse.
+    /// </summary>
+    /// <param name="ipAdresseId">Id der IP-Adresse.</param>
     public void Delete(int ipAdresseId)
     {
         _repository.Delete(ipAdresseId);

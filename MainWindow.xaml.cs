@@ -8,6 +8,10 @@ namespace IPAM_WPF_App;
 
 public partial class MainWindow : Window
 {
+    private const string KeineAuswahlTitel = "Keine Auswahl";
+    private const string SubnetAuswaehlenText = "Bitte zuerst ein Subnet auswählen.";
+    private const string IPAdresseAuswaehlenText = "Bitte zuerst eine IP-Adresse auswählen.";
+
     private readonly SubnetService _subnetService;
     private readonly IPAdresseService _ipAdresseService;
 
@@ -57,7 +61,7 @@ public partial class MainWindow : Window
         {
             IpAdresseDataGrid.ItemsSource = null;
             SelectedSubnetTextBlock.Text =
-                "Bitte zuerst ein Subnet auswählen.";
+                SubnetAuswaehlenText;
             return;
         }
 
@@ -70,11 +74,11 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        bool wurdeHinzugefuegt = _subnetService.Add(
+        bool istHinzugefuegt = _subnetService.Add(
             SubnetNameTextBox.Text,
             SubnetBeschreibungTextBox.Text);
 
-        if (!wurdeHinzugefuegt)
+        if (!istHinzugefuegt)
         {
             MessageBox.Show(
                 "Bitte einen Namen oder ein CIDR für das Subnet eingeben.",
@@ -96,8 +100,8 @@ public partial class MainWindow : Window
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
             MessageBox.Show(
-                "Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl",
+                SubnetAuswaehlenText,
+                KeineAuswahlTitel,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -118,7 +122,7 @@ public partial class MainWindow : Window
         _subnetService.Delete(subnet.Id);
         IpAdresseDataGrid.ItemsSource = null;
         SelectedSubnetTextBlock.Text =
-            "Bitte zuerst ein Subnet auswählen.";
+            SubnetAuswaehlenText;
         LoadSubnets();
     }
 
@@ -129,8 +133,8 @@ public partial class MainWindow : Window
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
             MessageBox.Show(
-                "Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl",
+                SubnetAuswaehlenText,
+                KeineAuswahlTitel,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -172,8 +176,8 @@ public partial class MainWindow : Window
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
             MessageBox.Show(
-                "Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl",
+                SubnetAuswaehlenText,
+                KeineAuswahlTitel,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -182,8 +186,8 @@ public partial class MainWindow : Window
         if (IpAdresseDataGrid.SelectedItem is not IPAdresseDto ipAdresse)
         {
             MessageBox.Show(
-                "Bitte zuerst eine IP-Adresse auswählen.",
-                "Keine Auswahl",
+                IPAdresseAuswaehlenText,
+                KeineAuswahlTitel,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -200,8 +204,8 @@ public partial class MainWindow : Window
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
             MessageBox.Show(
-                "Bitte zuerst ein Subnet auswählen.",
-                "Keine Auswahl",
+                SubnetAuswaehlenText,
+                KeineAuswahlTitel,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -210,8 +214,8 @@ public partial class MainWindow : Window
         if (IpAdresseDataGrid.SelectedItem is not IPAdresseDto ipAdresse)
         {
             MessageBox.Show(
-                "Bitte zuerst eine IP-Adresse auswählen.",
-                "Keine Auswahl",
+                IPAdresseAuswaehlenText,
+                KeineAuswahlTitel,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
