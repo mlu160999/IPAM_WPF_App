@@ -1,14 +1,46 @@
-# K2 -- ORM / Entity Framework Core
+# MODUL PROG1 – K2: ORM mit Entity Framework Core
+
+**Projekt:** IPAM_WPF_App\
+**Autoren:** Madalina Luca, Muzamil Abukar Haji Ali, Sabri Mahdi\
+**Branch:** `feature/k2-efcore` → `master` (Pull Request #3)
+
+## Inhaltsverzeichnis
+
+1.  [Ziel](#ziel)
+2.  [Was ist ein ORM?](#was-ist-ein-orm)
+3.  [Projektstruktur nach K2](#projektstruktur-nach-k2)
+4.  [Welche Klasse macht was?](#welche-klasse-macht-was)
+5.  [Änderungen gegenüber K1 und warum](#änderungen-gegenüber-k1-und-warum)
+6.  [Migrations](#migrations)
+7.  [Ablauf: Klick auf «Status weiter»](#ablauf-klick-auf-status-weiter)
+8.  [Übersicht: Serviceklasse → DataAccess](#übersicht-serviceklasse--dataaccess)
+9.  [Kontrolle](#kontrolle)
+10. [Git](#git)
+11. [Stolpersteine](#stolpersteine)
+12. [KI-Protokoll K2](#ki-protokoll-k2)
+13. [Reflexion](#reflexion)
 
 ## Ziel
 
-Die DataAccess-Schicht der IPAM-WPF-App wurde von rohem ADO.NET
-(`SqliteConnection`, `SqliteCommand`, SQL-Strings) auf
-**Entity Framework Core** umgestellt.\
-Die Funktionalität bleibt gleich. UI und Service-Schicht wurden
-**nicht verändert**, nur das Innere der DataAccess-Klassen.
+In K1 hat die DataAccess-Schicht SQL-Befehle als Text geschrieben und
+die Ergebnisse Zeile für Zeile in Objekte kopiert. In K2 übernimmt das
+**Entity Framework Core (EF Core)**.
 
-**UI → Services → DataAccess → AppDbContext (EF Core) → SQLite**
+Nur das **Innere** der DataAccess-Klassen ändert sich. Die
+Methodennamen bleiben gleich, deshalb merken Services und UI nichts vom
+Umbau. Genau dafür haben wir in K1 die Schichten getrennt.
+
+## Was ist ein ORM?
+
+ORM steht für **Object-Relational Mapping**. Ein ORM übersetzt
+automatisch zwischen C#-Objekten und Datenbanktabellen.
+
+| Vorher (K1, ADO.NET) | Jetzt (K2, EF Core) |
+|---|---|
+| Wir schreiben SQL als Text: `SELECT ... FROM IPAdresse WHERE ...` | Wir schreiben C# mit LINQ: `.Where(a => a.SubnetId == id)` |
+| Wir lesen jede Zeile mit `reader.GetString(1)` und bauen das Objekt selbst | EF Core erzeugt die Objekte automatisch |
+| Wir schreiben `CREATE TABLE` selbst | EF Core erzeugt die Tabellen aus den Klassen (**Migration**) |
+| Wir öffnen und schliessen Verbindungen selbst | EF Core verwaltet die Verbindung |
 
 ## Projektstruktur nach K2
 
@@ -19,126 +51,109 @@ IPAM_WPF_App/
 │   ├── DbInitializer.cs         (geändert)
 │   ├── IPAdresseDataAccess.cs   (geändert)
 │   └── SubnetDataAccess.cs      (geändert)
-├── Migrations/                  (neu, von EF Core generiert)
-│   ├── <Zeitstempel>_InitialDbCreation.cs
-│   ├── <Zeitstempel>_InitialDbCreation.Designer.cs
+├── Migrations/                  (neu, von EF Core erzeugt)
+│   ├── 20261030103648_InitialDbCreation.cs
+│   ├── 20261030103648_InitialDbCreation.Designer.cs
 │   └── AppDbContextModelSnapshot.cs
 ├── Models/
 │   ├── IPAdresse.cs             (geändert)
 │   ├── IPStatus.cs
 │   └── Subnet.cs                (geändert)
 ├── Services/                    (unverändert)
-│   ├── ApplicationService.cs
-│   ├── IPAdresseService.cs
-│   └── SubnetService.cs
-├── App.xaml / App.xaml.cs       (unverändert)
-├── MainWindow.xaml / .xaml.cs   (unverändert)
-└── IPAM_WPF_App.csproj          (geändert)
+├── App.xaml / MainWindow.xaml   (unverändert)
+├── IPAM_WPF_App.csproj          (geändert)
+└── IPAM_WPF_App.slnx            (neu)
 ```
 
-## Durchgeführte Änderungen
+## Welche Klasse macht was?
+
+| Klasse | Aufgabe in K2 |
+|---|---|
+| `AppDbContext` (**neu**) | Die «Verbindung» zur Datenbank. Kennt den Connection-String, enthält pro Tabelle ein `DbSet` (`Subnets`, `IPAdressen`) und beschreibt Regeln wie UNIQUE, CHECK und Fremdschlüssel. |
+| `DbInitializer` | Ruft beim Start `context.Database.Migrate()` auf. Das erstellt die Datenbank oder bringt sie auf den neusten Stand. |
+| `SubnetDataAccess` | Lesen, Speichern, Ändern und Löschen von Subnetzen, jetzt mit LINQ statt SQL |
+| `IPAdresseDataAccess` | Dasselbe für IP-Adressen |
+| `Subnet` | Hat neu eine Liste `IPAdressen`: alle IP-Adressen dieses Subnets |
+| `IPAdresse` | Hat neu ein Feld `Subnet`: das Subnet, zu dem die Adresse gehört |
+| Migrations | Von EF Core erzeugter Code, der die Tabellen erstellt |
+| Services, UI | Unverändert |
+
+## Änderungen gegenüber K1 und warum
 
 ### 1. NuGet-Pakete (`IPAM_WPF_App.csproj`)
 
-| Paket | Version | Zweck |
+| Paket | Wozu |
+|---|---|
+| `Microsoft.EntityFrameworkCore.Sqlite` | EF Core mit SQLite. Bringt `Microsoft.Data.Sqlite` selbst mit, deshalb wurde das alte Paket entfernt. |
+| `Microsoft.EntityFrameworkCore.Design` | Wird für Migrations gebraucht (nur beim Entwickeln) |
+| `Microsoft.EntityFrameworkCore.Tools` | Stellt die Befehle `Add-Migration` und `Update-Database` in der Paket-Manager-Konsole bereit |
+| `SQLitePCLRaw.lib.e_sqlite3` (3.53.3) | Erzwingt eine aktuelle SQLite-Version. EF Core bringt sonst Version 2.1.11 mit, die eine bekannte Sicherheitslücke hat (Warnung **NU1903**). |
+
+### 2. `AppDbContext` (neu)
+
+``` csharp
+public DbSet<Subnet> Subnets { get; set; }
+public DbSet<IPAdresse> IPAdressen { get; set; }
+```
+
+Ein `DbSet` steht für eine Tabelle. Man kann es mit LINQ abfragen wie
+eine Liste.
+
+In `OnModelCreating` stehen die Regeln, die vorher im `CREATE TABLE`
+standen (**Fluent API**):
+
+| Regel aus K1 (SQL) | In K2 (Fluent API) | Bedeutung |
 |---|---|---|
-| `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.10 | EF Core mit SQLite-Provider |
-| `Microsoft.EntityFrameworkCore.Design` | 10.0.10 | Wird für Migrations benötigt (nur Entwicklungszeit) |
-| `Microsoft.EntityFrameworkCore.Tools` | 10.0.10 | Stellt `Add-Migration` / `Update-Database` in der Paket-Manager-Konsole bereit |
-| `SQLitePCLRaw.lib.e_sqlite3` | 3.53.3 | Fixiert eine aktuelle SQLite-Engine (siehe unten) |
+| Tabellenname `Subnet` | `ToTable("Subnet")` | Sonst würde EF Core die Tabelle `Subnets` nennen |
+| `CHECK (Status IN (0, 1, 2))` | `HasCheckConstraint(...)` | Nur gültige Status-Werte |
+| `UNIQUE (SubnetId, Adresse)` | `HasIndex(...).IsUnique()` | Dieselbe IP nur einmal pro Subnet |
+| `FOREIGN KEY ... ON DELETE CASCADE` | `HasOne(...).WithMany(...).OnDelete(Cascade)` | Beim Löschen eines Subnets werden seine IPs mitgelöscht |
 
--   `Microsoft.Data.Sqlite` wurde entfernt, weil EF Core es selbst
-    mitbringt.
--   `Design` und `Tools` sind mit `PrivateAssets=all` eingebunden und
-    werden nicht mit der App ausgeliefert.
--   Das Paket `Tools` steht nicht in der Aufgabenstellung, ohne es
-    kennt die Paket-Manager-Konsole den Befehl `Add-Migration` aber
-    nicht.
+### 3. `DbInitializer`
 
-**Sicherheitslücke NU1903:** EF Core bringt standardmässig die
-SQLite-Engine `SQLitePCLRaw.lib.e_sqlite3` 2.1.11 mit. Diese hat eine
-bekannte Sicherheitslücke (GHSA-2m69-gcr7-jv3q, Speicherfehler in
-SQLite vor 3.50.2). Durch die explizite Referenz auf Version 3.53.3
-wird eine aktuelle Engine verwendet und die Warnung verschwindet. Die
-Warnung hat ausserdem `Add-Migration` in der Paket-Manager-Konsole
-abbrechen lassen.
+Vorher etwa 70 Zeilen SQL, jetzt eine Zeile: `context.Database.Migrate()`.
 
-### 2. `DataAccess/AppDbContext.cs` (neu)
+**Warum `Migrate()` beim Start und nicht nur `Update-Database`?**
+`Update-Database` legt die `app.db` im Projektordner an. Die App läuft
+aber aus `bin\Debug\net10.0-windows\` und sucht die Datei dort. Mit
+`Migrate()` entsteht die Datenbank immer am richtigen Ort.
 
-Zentrale Klasse für den Datenbankzugriff, erbt von `DbContext`.
+### 4. DataAccess-Klassen
 
--   **Connection-String** `Data Source=app.db` liegt neu hier (vorher in
-    `DbInitializer`).
--   **`DbSet<Subnet> Subnets`** und **`DbSet<IPAdresse> IPAdressen`**:
-    je ein DbSet pro Entity, darüber wird mit LINQ abgefragt.
--   **`OnConfiguring`**: verbindet den Context mit SQLite (`UseSqlite`).
--   **`OnModelCreating`** (Fluent API): bildet alle Regeln des
-    bisherigen `CREATE TABLE` nach, damit sich die Datenbank gleich
-    verhält:
+Jede Methode folgt demselben Muster:
 
-| Bisher (SQL) | Jetzt (Fluent API) |
+``` csharp
+using var context = new AppDbContext();   // 1. Context öffnen
+var ip = context.IPAdressen.Find(id);     // 2. Daten laden
+ip.Status = neuerStatus;                  //    und ändern
+context.SaveChanges();                    // 3. Speichern
+                                          //    'using' schliesst den Context
+```
+
+EF Core merkt sich alle geladenen Objekte (**Change Tracking**). Bei
+`SaveChanges()` erkennt es selbst, was sich geändert hat, und erzeugt
+das passende `UPDATE`.
+
+| Vorher (SQL) | Jetzt (EF Core) |
 |---|---|
-| Tabellenname `Subnet` / `IPAdresse` | `ToTable("Subnet")` / `ToTable("IPAdresse")` |
-| `CHECK (Status IN (0, 1, 2))` | `HasCheckConstraint("CK_IPAdresse_Status", ...)` |
-| `UNIQUE (SubnetId, Adresse)` | `HasIndex(a => new { a.SubnetId, a.Adresse }).IsUnique()` |
-| `FOREIGN KEY ... ON DELETE CASCADE` | `HasOne(...).WithMany(...).HasForeignKey(...).OnDelete(Cascade)` |
+| `SELECT ... WHERE SubnetId = ... ORDER BY Adresse` | `.Where(a => a.SubnetId == id).OrderBy(a => a.Adresse).ToList()` |
+| `INSERT` + `last_insert_rowid()` | `Add(subnet)` + `SaveChanges()`. Danach ist `subnet.Id` automatisch gesetzt. |
+| `UPDATE ... SET ...` | `Find()`, Property ändern, `SaveChanges()` |
+| `DELETE FROM ...` | `Find()`, `Remove()`, `SaveChanges()` |
+| Fehlercode 2067 (Duplikat) abfangen | Vorher mit `.Any(...)` fragen, ob die Adresse schon existiert |
 
-Ohne `ToTable` würde EF Core die Tabellen nach den DbSets benennen
-(`Subnets`, `IPAdressen`).
+**Bewusste Entscheidungen:**
 
-### 3. `DataAccess/DbInitializer.cs` (geändert)
+-   **Pro Methode ein neuer Context (`using`).** Ein Context soll nur
+    kurz leben. Ein dauerhaft offener Context ist eine bekannte
+    ORM-Falle.
+-   **`Update` lädt zuerst und ändert nur einzelne Felder.** So bleibt
+    z. B. das Erstelldatum eines Subnets unverändert.
+-   **Duplikat mit `Any()` prüfen.** Den Datenbankfehler abzufangen wäre
+    mit EF Core umständlich und an SQLite-Fehlercodes gebunden. Der
+    UNIQUE-Index bleibt als Sicherheitsnetz bestehen.
 
--   Vorher: `SqliteConnection`, `PRAGMA foreign_keys`, `CREATE TABLE`
-    und eine Umbenennungslogik für alte Spalten.
--   Jetzt: nur noch `context.Database.Migrate()`.
-
-`Migrate()` führt beim App-Start alle noch nicht angewendeten
-Migrations aus. Beim ersten Start wird die Datenbank erstellt, bei
-späteren Änderungen werden nur neue Migrations nachgespielt. EF Core
-merkt sich in der Tabelle `__EFMigrationsHistory`, was schon
-angewendet wurde.
-
-**Warum `Migrate()` beim Start statt nur `Update-Database`?**\
-`Update-Database` erstellt die `app.db` im Projektordner. Die App
-läuft aber aus `bin\Debug\net10.0-windows\` und sucht die Datei dort.
-Mit `Migrate()` entsteht die Datenbank immer dort, wo die App sie
-braucht.
-
-Die Klasse heisst weiterhin `DbInitializer`, damit der
-`ApplicationService` unverändert bleibt.
-
-### 4. `DataAccess/SubnetDataAccess.cs` und `IPAdresseDataAccess.cs` (geändert)
-
-Die **Methodensignaturen (Name, Parameter, Rückgabewert) sind
-unverändert** (Aufgabe B3.8). Jede Methode folgt demselben Ablauf:
-**Context erstellen → mit Daten arbeiten → `SaveChanges()`**, mit
-`using` für jeden Context (Aufgabe B3.9).
-
-| Bisher (ADO.NET) | Jetzt (EF Core / LINQ) |
-|---|---|
-| `SELECT ... WHERE SubnetId = $id ORDER BY Adresse` | `.Where(a => a.SubnetId == id).OrderBy(a => a.Adresse).ToList()` |
-| `INSERT` + `SELECT last_insert_rowid()` | `.Add(subnet)` + `SaveChanges()`, danach ist `subnet.Id` gesetzt |
-| `UPDATE ... SET ...` | Objekt mit `Find()` laden, Properties ändern, `SaveChanges()` |
-| `DELETE FROM ...` | `Find()` + `Remove()` + `SaveChanges()` |
-| `SqliteException` mit Code 2067 abfangen | Vorher mit `.Any(...)` prüfen, ob die Adresse existiert |
-
-Bewusste Entscheidungen:
-
--   **`Update()` lädt das Objekt und setzt einzelne Felder**, statt
-    `context.Update()` zu verwenden. So werden wie bisher nur Name und
-    Beschreibung geändert, `Erstellt` bleibt unverändert.
--   **`TryAdd()` prüft Duplikate mit `Any()`**. Mit EF Core käme der
-    Datenbankfehler verpackt als `DbUpdateException`, das Abfangen wäre
-    umständlich und an SQLite-Fehlercodes gebunden. Der UNIQUE-Index in
-    der Datenbank bleibt als Sicherheitsnetz bestehen.
--   Enums (`IPStatus`) werden von EF Core automatisch als Zahl
-    gespeichert, die `(int)`-Casts sind entfallen.
--   Verbindungen und `PRAGMA foreign_keys` verwaltet EF Core selbst,
-    `CreateOpenConnection()` ist entfallen.
-
-### 5. `Models/Subnet.cs` und `Models/IPAdresse.cs` (geändert)
-
-Neue **Navigation Properties** für die 1:n-Beziehung:
+### 5. Navigation Properties in den Models
 
 ``` csharp
 // Subnet.cs: ein Subnet hat viele IP-Adressen
@@ -148,99 +163,233 @@ public ICollection<IPAdresse> IPAdressen { get; set; } = new List<IPAdresse>();
 public Subnet? Subnet { get; set; }
 ```
 
--   Werden in `AppDbContext` für `HasOne` / `WithMany` verwendet.
--   Sind standardmässig leer (`null` bzw. leere Liste), solange sie
-    nicht mit `.Include(...)` mitgeladen werden (siehe Lazy Loading /
-    N+1 in Kapitel 2.6).
--   Grundlage für die K2-Vertiefung (`Include`) und die DTOs in K3
-    (z. B. `SubnetName = a.Subnet.Name`).
+Damit kann man im Code direkt von einem Objekt zum anderen springen,
+z. B. `ipAdresse.Subnet.Name`. **Achtung:** Diese Felder sind leer,
+solange man sie nicht ausdrücklich mitlädt (`.Include(...)`). Das `?`
+bei `Subnet?` erinnert daran.
 
-### 6. Migration `InitialDbCreation` (neu)
+### 6. Projektmappe `IPAM_WPF_App.slnx` (neu)
 
-Erstellt mit der Paket-Manager-Konsole:
+Visual Studio braucht eine Projektmappe. Wer das Repo klont, öffnet
+einfach die `.slnx`. Wird nur der Ordner geöffnet («Folder View»),
+lädt Visual Studio die NuGet-Pakete nicht und der Build schlägt fehl.
+
+## Migrations
+
+Eine Migration ist von EF Core erzeugter C#-Code, der die Datenbank
+verändert.
 
 ``` text
-Add-Migration InitialDbCreation
+Add-Migration InitialDbCreation     ← in der Paket-Manager-Konsole
 ```
 
--   `<Zeitstempel>_InitialDbCreation.cs`: erstellt die Tabellen
-    `Subnet` und `IPAdresse` inkl. Fremdschlüssel (Cascade), CHECK und
-    Unique-Index.
--   `<Zeitstempel>_InitialDbCreation.Designer.cs`: Metadaten zur
-    Migration.
--   `AppDbContextModelSnapshot.cs`: aktueller Stand des Modells. EF
-    Core vergleicht bei der nächsten Migration damit.
+| Datei | Inhalt |
+|---|---|
+| `..._InitialDbCreation.cs` | Erstellt die Tabellen `Subnet` und `IPAdresse` mit Fremdschlüssel, CHECK und Unique-Index |
+| `..._InitialDbCreation.Designer.cs` | Metadaten zur Migration |
+| `AppDbContextModelSnapshot.cs` | Aktueller Stand des Modells. EF Core vergleicht bei der nächsten Migration damit. |
 
-Prüfung der generierten Migration gegen das bisherige Schema (Aufgabe
-B2.6): Tabellen `Subnet` und `IPAdresse`, Spalten, Fremdschlüssel mit
-`ReferentialAction.Cascade`, CHECK-Constraint auf `Status` und
-Unique-Index auf `(SubnetId, Adresse)` sind enthalten.
+EF Core merkt sich in der Tabelle `__EFMigrationsHistory`, welche
+Migrations schon angewendet wurden.
 
-**Hinweis:** Die alte `app.db` aus K0/K1 musste gelöscht werden. Sie
-wurde mit rohem SQL erstellt und hat keine Tabelle
-`__EFMigrationsHistory`. `Migrate()` hätte sonst versucht, die
-Tabellen erneut anzulegen ("table already exists"). Beim nächsten
-Start wurde die Datenbank aus der Migration neu erstellt.
+**Vergleich mit dem alten Schema:** Tabellen, Spalten, Fremdschlüssel
+mit Cascade, CHECK und Unique-Index stimmen überein. Einzige Abweichung:
+`Beschreibung` ist jetzt `NOT NULL`. Das ist unproblematisch, weil der
+Service immer mindestens einen leeren Text speichert.
 
-### Unverändert
+**Alte `app.db` gelöscht:** Die Datenbank aus K1 wurde mit SQL erstellt
+und hat keine `__EFMigrationsHistory`. `Migrate()` hätte die Tabellen
+erneut anlegen wollen und wäre mit «table already exists» abgebrochen.
 
-`Services/*`, `MainWindow.xaml(.cs)`, `App.xaml(.cs)` und
-`Models/IPStatus.cs` wurden nicht angepasst. Das zeigt, dass durch die
-Schichtentrennung aus K1 nur die DataAccess-Schicht umgebaut werden
-musste.
+## Ablauf: Klick auf «Status weiter»
 
-## Kontrolle (B4)
-
--   App getestet: Subnet hinzufügen/löschen, IP hinzufügen, Duplikat
-    wird erkannt, Status-Workflow Frei → Reserviert → Zugewiesen →
-    Frei, IP löschen, beim Löschen eines Subnets werden die IPs
-    mitgelöscht, Daten bleiben nach Neustart erhalten.
--   **Kontrollfrage:** Im Ordner `DataAccess` gibt es keine Treffer mehr
-    für `SqliteConnection` oder `SqliteCommand`.
+1.  **UI** (unverändert): ruft `_ipAdresseService.AdvanceStatus(...)`
+    auf.
+2.  **Service** (unverändert): berechnet den neuen Status und ruft
+    `IPAdresseDataAccess.UpdateStatus(id, neuerStatus)` auf.
+3.  **DataAccess** (neu mit EF Core): `Find(id)`, Status setzen,
+    `SaveChanges()`.
+4.  **EF Core:** erzeugt `UPDATE IPAdresse SET Status = ... WHERE Id = ...`.
 
 ## Übersicht: Serviceklasse → DataAccess
 
-Unverändert gegenüber K1, nur die Umsetzung in DataAccess ist neu:
-
-| Serviceklasse | Service-Methode | Ruft auf in DataAccess | Umsetzung mit EF Core |
+| Serviceklasse | Service-Methode | DataAccess-Methode | Umsetzung mit EF Core |
 |---|---|---|---|
 | ApplicationService | InitializeDatabase() | DbInitializer.Initialize() | `Database.Migrate()` |
 | SubnetService | GetAll() | SubnetDataAccess.GetAll() | `OrderBy` + `ToList` |
-| SubnetService | Add(name, beschreibung) | SubnetDataAccess.Add(...) | `Add` + `SaveChanges` |
+| SubnetService | Add(...) | SubnetDataAccess.Add(...) | `Add` + `SaveChanges` |
 | SubnetService | Update(subnet) | SubnetDataAccess.Update(subnet) | `Find` + Felder setzen + `SaveChanges` |
-| SubnetService | Delete(subnetId) | SubnetDataAccess.Delete(id) | `Find` + `Remove` + `SaveChanges` |
-| IPAdresseService | GetBySubnetId(subnetId) | IPAdresseDataAccess.GetBySubnetId(...) | `Where` + `OrderBy` + `ToList` |
+| SubnetService | Delete(id) | SubnetDataAccess.Delete(id) | `Find` + `Remove` + `SaveChanges` |
+| IPAdresseService | GetBySubnetId(id) | IPAdresseDataAccess.GetBySubnetId(id) | `Where` + `OrderBy` + `ToList` |
 | IPAdresseService | Add(ipText, subnetId) | IPAdresseDataAccess.TryAdd(...) | `Any` + `Add` + `SaveChanges` |
-| IPAdresseService | AdvanceStatus(ipAdresse) | IPAdresseDataAccess.UpdateStatus(...) | `Find` + Status setzen + `SaveChanges` |
-| IPAdresseService | Delete(ipAdresseId) | IPAdresseDataAccess.Delete(id) | `Find` + `Remove` + `SaveChanges` |
+| IPAdresseService | AdvanceStatus(...) | IPAdresseDataAccess.UpdateStatus(...) | `Find` + Status setzen + `SaveChanges` |
+| IPAdresseService | Delete(id) | IPAdresseDataAccess.Delete(id) | `Find` + `Remove` + `SaveChanges` |
 
-## Git / GitHub
+## Kontrolle
 
-Branch: **`feature/k2-efcore`** (von `master`)
+-   App getestet: Subnet hinzufügen/löschen, IP hinzufügen, Duplikat
+    wird gemeldet, Status-Workflow, IP löschen, beim Löschen eines
+    Subnets verschwinden die IPs, Daten bleiben nach Neustart erhalten.
+-   **Kontrollfrage:** In `DataAccess/` gibt es kein `SqliteConnection`
+    und kein `SqliteCommand` mehr.
+-   Services und UI wurden nicht verändert.
 
-Commits in Schritten:
+## Git
+
+Branch `feature/k2-efcore`, gemergt über **Pull Request #3**:
 
 1.  `K2: Ergänzung der EF Core Packages`
 2.  `K2: Zentraler Connection String`
 3.  `K2: DB Context Anbindung mittels APPDbContext in Models und
     DataAccess für IPAdresse und Subnet`
-4.  `K2: Migration InitialDbCreation erstellt und SQLite-Engine auf
-    3.53.3 fixiert`
-
-Anschliessend Merge Request `feature/k2-efcore` → `master` mit Review
-durch ein Gruppenmitglied.
+4.  `K2: DB Migration mit NuGet. APP.DB Wurde gelöscht`
+5.  `Projektmappe`
+6.  `Dokumentations Struktur angepasst.`
+7.  `K2: Readme.md auf neusten Stand gebracht`
 
 ## Stolpersteine
 
--   **Visual Studio im Ordner-Modus ("Folder View"):** Die NuGet-Pakete
-    wurden nicht wiederhergestellt und der Build schlug fehl
-    (`EntityFrameworkCore does not exist`). Lösung: Projekt über
-    *File → Open → Project/Solution* mit der `.csproj` öffnen.
--   **Warnung NU1903 bricht `Add-Migration` ab:** siehe
-    Sicherheitslücke oben.
--   **Alte `app.db`:** musste gelöscht werden (siehe Migration).
+| Problem | Ursache | Lösung |
+|---|---|---|
+| Build-Fehler «EntityFrameworkCore does not exist» | Visual Studio hatte nur den **Ordner** geöffnet (Folder View), die NuGet-Pakete wurden nicht geladen | Projekt über *File → Open → Project/Solution* öffnen |
+| Warnung NU1903, `Add-Migration` bricht ab | Beim Umbau wurde das Paket `SQLitePCLRaw.lib.e_sqlite3` entfernt, dadurch kam die alte, unsichere SQLite-Version zurück | Paket in Version 3.53.3 wieder ergänzt |
+| Erster Push ohne Migration → App hätte keine Tabellen erstellt | `Add-Migration` war noch nicht ausgeführt | Migration erstellt und committet |
+| «table already exists» (vermieden) | Alte `app.db` aus K1 | Datei gelöscht, wird beim Start neu erstellt |
 
-## Ergebnis
+------------------------------------------------------------------------
 
-Die App funktioniert unverändert, verwendet aber keine SQL-Strings mehr.
-Der Datenzugriff läuft über `AppDbContext`, LINQ und Migrations.
+## KI-Protokoll K2
+
+**Tool:** Claude (Anthropic)
+
+### Eintrag 1 – Umbau auf EF Core
+
+**Prompt / Aufgabe:**\
+«Super, nun weiter mit K2.» (Grundlage: Aufgabenblatt K2 und unser
+`master` nach K1.)
+
+**Ergebnis der KI:**\
+Claude lieferte sieben Dateien: `.csproj` mit EF-Core-Paketen,
+`AppDbContext`, `DbInitializer` mit `Migrate()`, beide
+DataAccess-Klassen mit LINQ sowie die Models mit Navigation Properties.
+Die Methodensignaturen blieben gleich. Dazu kam eine Schritt-für-Schritt-
+Anleitung für Branch, Migration und Test.
+
+**Unsere Prüfung und Umsetzung:**\
+Wir haben den Branch `feature/k2-efcore` erstellt, die Dateien
+eingebaut und in drei Commits gepusht. Bevor wir weitergemacht haben,
+haben wir uns den Aufbau erklären lassen (nächster Eintrag).
+
+**Erkenntnis:**\
+Weil wir in K1 die Schichten getrennt haben, mussten Services und UI
+tatsächlich nicht angefasst werden.
+
+### Eintrag 2 – Verstehen, was geändert wurde
+
+**Prompt / Aufgabe:**\
+«Erklär mir wie das ganze funktioniert und was was macht» und später
+«Erklär mir alle deine Änderungen in den Files und wieso».
+
+**Ergebnis der KI:**\
+Claude erklärte Datei für Datei: was ein `DbSet` ist, was die Fluent
+API nachbildet, wie Migrations funktionieren, was Change Tracking ist
+und warum pro Methode ein neuer Context verwendet wird.
+
+**Unsere Prüfung und Umsetzung:**\
+Mit diesen Erklärungen konnten wir die generierte Migration selbst
+prüfen (Aufgabe B2.6) und haben die Abweichung bei `Beschreibung`
+(`NOT NULL`) festgestellt und bewertet.
+
+**Erkenntnis:**\
+Wir übernehmen KI-Code erst, wenn wir ihn erklären können. Die
+Erklärung «Datei für Datei mit Warum» war dafür hilfreicher als der
+Code selbst.
+
+### Eintrag 3 – Build-Fehler und Sicherheitswarnung
+
+**Prompt / Aufgabe:**\
+Wir haben Claude die vollständige Build-Ausgabe geschickt
+(«EntityFrameworkCore does not exist») und später die Meldung, dass
+`Add-Migration` wegen der Warnung NU1903 abbricht.
+
+**Ergebnis der KI:**\
+Ursache 1: Visual Studio war im Ordner-Modus geöffnet, deshalb wurden
+die Pakete nicht geladen. Ursache 2 war ein **Fehler der KI selbst**:
+Claude hatte das Paket `SQLitePCLRaw.lib.e_sqlite3` als «überflüssig»
+entfernt. Ohne dieses Paket verwendet EF Core eine alte SQLite-Version
+mit bekannter Sicherheitslücke. Claude erkannte den eigenen Fehler und
+lieferte die Korrektur.
+
+**Unsere Prüfung und Umsetzung:**\
+Wir haben das Projekt richtig geöffnet, die Paketzeile ergänzt,
+`Add-Migration InitialDbCreation` ausgeführt, die alte `app.db`
+gelöscht und alle Funktionen getestet. Beim Branch-Check fiel auf, dass
+die Migration im ersten Push fehlte. Wir haben sie nachgeliefert.
+
+**Erkenntnis:**\
+Auch die KI macht Fehler, hier eine Sicherheitslücke durch ein
+entferntes Paket. Ohne unseren eigenen Build in Visual Studio wäre das
+nicht aufgefallen. Build-Warnungen muss man ernst nehmen und nicht
+einfach ignorieren.
+
+### Fragen aus dem Aufgabenblatt
+
+**Welche Prompts habt ihr verwendet, um den Umstieg auf EF Core zu
+planen?**\
+Wir haben Claude mit «Super, nun weiter mit K2» auf Basis des
+Aufgabenblatts und unseres `master` beauftragt. Danach haben wir gezielt
+Erklärungen verlangt: «Erklär mir, wie das ganze funktioniert und was
+was macht» und «Erklär mir alle deine Änderungen in den Files und
+wieso». Bei Problemen haben wir die vollständigen Fehlermeldungen aus
+Visual Studio geschickt.
+
+**Was hat die KI beim Umbau auf EF Core gut gemacht, wo musstet ihr
+korrigieren?**\
+Gut: Die Methodensignaturen blieben gleich, Services und UI mussten
+nicht angepasst werden. Alle Regeln aus dem alten `CREATE TABLE`
+(UNIQUE, CHECK, Cascade) wurden mit der Fluent API nachgebildet. Die
+Erklärungen waren verständlich. Korrigieren mussten wir: Claude hatte
+das Paket `SQLitePCLRaw.lib.e_sqlite3` entfernt, was zur
+Sicherheitswarnung NU1903 führte und `Add-Migration` abbrechen liess.
+Ausserdem setzte die Anleitung voraus, dass das Projekt richtig
+geöffnet ist. Bei uns war Visual Studio im Ordner-Modus.
+
+**Wo wollte die KI zu schnell Interfaces oder ein Repository-Pattern
+einführen, und wie habt ihr sie zurückgeholt?**\
+Das ist nicht passiert. Claude hat die Klassen bewusst `DataAccess`
+genannt und keine Interfaces eingeführt. Die Navigation Properties
+(`Subnet.IPAdressen`, `IPAdresse.Subnet`) wurden zwar schon mit Blick
+auf K3 erklärt, sie gehören aber laut Aufgabenblatt zu K2 (1:n-Beziehung
+in EF Core).
+
+------------------------------------------------------------------------
+
+## Reflexion
+
+**Was ist am Umgang mit der Datenbank jetzt einfacher als vorher?**
+
+-   **Kein SQL mehr als Text.** Tippfehler in SQL-Strings fielen früher
+    erst zur Laufzeit auf. LINQ prüft der Compiler schon beim Bauen.
+-   **Kein manuelles Kopieren.** Früher haben wir jede Spalte mit
+    `reader.GetString(1)` von Hand ins Objekt übertragen. Jetzt macht
+    das EF Core, inklusive der neuen `Id` nach dem Speichern.
+-   **Die Datenbank folgt dem Code.** Statt `CREATE TABLE` von Hand zu
+    pflegen, ändern wir die Klasse und erzeugen eine Migration.
+
+**Was ist (noch) ungewohnt?**
+
+-   **Vieles passiert unsichtbar.** Welches SQL EF Core erzeugt und
+    wann genau es Änderungen erkennt (Change Tracking), sieht man nicht
+    direkt.
+-   **Der Ablauf mit Migrations.** Paket-Manager-Konsole,
+    `Add-Migration`, die alte `app.db` löschen, die Datenbank im
+    `bin`-Ordner statt im Projektordner: Das waren viele neue Schritte
+    mit eigenen Stolpersteinen.
+-   **Navigation Properties sind leer,** solange man sie nicht mit
+    `.Include()` lädt. Das muss man wissen, sonst wundert man sich über
+    `null`.
+
+**Was wir gelernt haben:**\
+Build-Warnungen sind ernst zu nehmen. Die Sicherheitslücke NU1903 kam
+durch eine KI-Änderung und wäre ohne unseren eigenen Build nicht
+aufgefallen.
