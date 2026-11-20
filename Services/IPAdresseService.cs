@@ -65,8 +65,7 @@ public class IPAdresseService
     }
 
     /// <summary>
-    /// Schaltet den Status einer IP-Adresse eine Stufe weiter
-    /// (Frei, Reserviert, Zugewiesen und wieder Frei).
+    /// Schaltet den Status einer IP-Adresse eine Stufe weiter.
     /// Existiert die Id nicht, passiert nichts.
     /// </summary>
     /// <param name="ipAdresseId">Id der IP-Adresse.</param>
@@ -78,12 +77,7 @@ public class IPAdresseService
             return;
         }
 
-        ipAdresse.Status = ipAdresse.Status switch
-        {
-            IPStatus.Frei => IPStatus.Reserviert,
-            IPStatus.Reserviert => IPStatus.Zugewiesen,
-            _ => IPStatus.Frei
-        };
+        ipAdresse.Status = IPStatusWorkflow.GetNextStatus(ipAdresse.Status);
         _repository.Update(ipAdresse);
     }
 

@@ -1,6 +1,7 @@
 using IPAM_WPF_App.Dtos;
 using IPAM_WPF_App.Models;
 using IPAM_WPF_App.Services;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -53,20 +54,57 @@ public partial class MainWindow : Window
             _ipAdresseService.GetBySubnetId(subnetId);
     }
 
+    private void ResetIpAdressenAnzeige()
+    {
+        IpAdresseDataGrid.ItemsSource = null;
+        SelectedSubnetTextBlock.Text = SubnetAuswaehlenText;
+    }
+
+    // Liefert das ausgewählte Subnet oder zeigt einen Hinweis, wenn keines ausgewählt ist.
+    private bool TryGetSelectedSubnet([NotNullWhen(true)] out Subnet? subnet)
+    {
+        subnet = SubnetDataGrid.SelectedItem as Subnet;
+        if (subnet == null)
+        {
+            ShowInfo(SubnetAuswaehlenText);
+        }
+
+        return subnet != null;
+    }
+
+    // Liefert die ausgewählte IP-Adresse oder zeigt einen Hinweis, wenn keine ausgewählt ist.
+    private bool TryGetSelectedIPAdresse([NotNullWhen(true)] out IPAdresseDto? ipAdresse)
+    {
+        ipAdresse = IpAdresseDataGrid.SelectedItem as IPAdresseDto;
+        if (ipAdresse == null)
+        {
+            ShowInfo(IPAdresseAuswaehlenText);
+        }
+
+        return ipAdresse != null;
+    }
+
+    private static void ShowInfo(string text)
+    {
+        MessageBox.Show(text, KeineAuswahlTitel, MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private static void ShowWarning(string text, string titel)
+    {
+        MessageBox.Show(text, titel, MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
     private void SubnetDataGrid_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
     {
         if (SubnetDataGrid.SelectedItem is not Subnet subnet)
         {
-            IpAdresseDataGrid.ItemsSource = null;
-            SelectedSubnetTextBlock.Text =
-                SubnetAuswaehlenText;
+            ResetIpAdressenAnzeige();
             return;
         }
 
-        SelectedSubnetTextBlock.Text =
-            $"Ausgewähltes Subnet: {subnet.Name}";
+        SelectedSubnetTextBlock.Text = $"Ausgewähltes Subnet: {subnet.Name}";
         LoadIpAdressen(subnet.Id);
     }
 
@@ -80,11 +118,9 @@ public partial class MainWindow : Window
 
         if (!istHinzugefuegt)
         {
-            MessageBox.Show(
+            ShowWarning(
                 "Bitte einen Namen oder ein CIDR für das Subnet eingeben.",
-                "Eingabe fehlt",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Eingabe fehlt");
             return;
         }
 
@@ -97,13 +133,8 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        if (SubnetDataGrid.SelectedItem is not Subnet subnet)
+        if (!TryGetSelectedSubnet(out var subnet))
         {
-            MessageBox.Show(
-                SubnetAuswaehlenText,
-                KeineAuswahlTitel,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
             return;
         }
 
@@ -120,9 +151,7 @@ public partial class MainWindow : Window
         }
 
         _subnetService.Delete(subnet.Id);
-        IpAdresseDataGrid.ItemsSource = null;
-        SelectedSubnetTextBlock.Text =
-            SubnetAuswaehlenText;
+        ResetIpAdressenAnzeige();
         LoadSubnets();
     }
 
@@ -130,13 +159,8 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        if (SubnetDataGrid.SelectedItem is not Subnet subnet)
+        if (!TryGetSelectedSubnet(out var subnet))
         {
-            MessageBox.Show(
-                SubnetAuswaehlenText,
-                KeineAuswahlTitel,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
             return;
         }
 
@@ -147,19 +171,15 @@ public partial class MainWindow : Window
         switch (result)
         {
             case IPAdresseAddResult.Ungueltig:
-                MessageBox.Show(
+                ShowWarning(
                     "Bitte eine gültige IPv4- oder IPv6-Adresse eingeben.",
-                    "Ungültige IP-Adresse",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    "Ungültige IP-Adresse");
                 return;
 
             case IPAdresseAddResult.BereitsVorhanden:
-                MessageBox.Show(
+                ShowWarning(
                     "Diese IP-Adresse existiert in diesem Subnet bereits.",
-                    "Doppelter Eintrag",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    "Doppelter Eintrag");
                 return;
 
             case IPAdresseAddResult.Erfolgreich:
@@ -173,23 +193,9 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        if (SubnetDataGrid.SelectedItem is not Subnet subnet)
+        if (!TryGetSelectedSubnet(out var subnet)
+            || !TryGetSelectedIPAdresse(out var ipAdresse))
         {
-            MessageBox.Show(
-                SubnetAuswaehlenText,
-                KeineAuswahlTitel,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        if (IpAdresseDataGrid.SelectedItem is not IPAdresseDto ipAdresse)
-        {
-            MessageBox.Show(
-                IPAdresseAuswaehlenText,
-                KeineAuswahlTitel,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
             return;
         }
 
@@ -201,23 +207,9 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        if (SubnetDataGrid.SelectedItem is not Subnet subnet)
+        if (!TryGetSelectedSubnet(out var subnet)
+            || !TryGetSelectedIPAdresse(out var ipAdresse))
         {
-            MessageBox.Show(
-                SubnetAuswaehlenText,
-                KeineAuswahlTitel,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        if (IpAdresseDataGrid.SelectedItem is not IPAdresseDto ipAdresse)
-        {
-            MessageBox.Show(
-                IPAdresseAuswaehlenText,
-                KeineAuswahlTitel,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
             return;
         }
 
