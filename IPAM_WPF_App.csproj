@@ -16,11 +16,20 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
-		
+
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.10">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
+	</ItemGroup>
+
+	<!-- Das Testprojekt liegt in einem Unterordner. Ohne diese Zeilen würde das
+	     Hauptprojekt die Test-Dateien automatisch mitkompilieren und scheitern. -->
+	<ItemGroup>
+		<Compile Remove="IPAM_WPF_App.Tests\**" />
+		<EmbeddedResource Remove="IPAM_WPF_App.Tests\**" />
+		<None Remove="IPAM_WPF_App.Tests\**" />
+		<Page Remove="IPAM_WPF_App.Tests\**" />
 	</ItemGroup>
 
 </Project>
