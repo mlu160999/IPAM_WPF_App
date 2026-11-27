@@ -361,3 +361,18 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# K5: lokale Konfiguration und Umgebungsdateien
+/appsettings.json
+/appsettings.*.json
+!/appsettings.Example.json
+.env
+.env.*
+
+# K5: lokale SQLite-Datenbanken und Begleitdateien
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*

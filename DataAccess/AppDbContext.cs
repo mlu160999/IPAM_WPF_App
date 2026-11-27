@@ -1,11 +1,50 @@
 using IPAM_WPF_App.Models;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
+using System.Text.Json;
 
 namespace IPAM_WPF_App.DataAccess;
 
 public class AppDbContext : DbContext
 {
-    public const string ConnectionString = "Data Source=app.db";
+    public static string ConnectionString => ReadConnectionString();
+
+    private static string ReadConnectionString()
+    {
+        string path = Path.Combine(
+            AppContext.BaseDirectory, "appsettings.json");
+
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException(
+                "Lokale appsettings.json fehlt. Vorlage kopieren " +
+                "und ConnectionStrings:Ipam eintragen.");
+        }
+
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var root = document.RootElement;
+
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("ConnectionStrings", out var strings)
+            || strings.ValueKind != JsonValueKind.Object
+            || !strings.TryGetProperty("Ipam", out var value)
+            || value.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidOperationException(
+                "ConnectionStrings:Ipam fehlt oder ist kein Text.");
+        }
+
+        string connectionString = value.GetString()!;
+
+        if (string.IsNullOrWhiteSpace(connectionString)
+            || connectionString.Contains("<LOKALER_DB_PFAD>"))
+        {
+            throw new InvalidOperationException(
+                "Lokalen SQLite-Pfad in appsettings.json eintragen.");
+        }
+
+        return connectionString;
+    }
 
     public DbSet<Subnet> Subnets { get; set; } = null!;
     public DbSet<IPAdresse> IPAdressen { get; set; } = null!;

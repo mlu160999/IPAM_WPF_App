@@ -32,4 +32,10 @@
 		<Page Remove="IPAM_WPF_App.Tests\**" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<None Update="appsettings.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
+		</None>
+	</ItemGroup>
 </Project>
